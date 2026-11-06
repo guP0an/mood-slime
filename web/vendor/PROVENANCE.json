@@ -1,0 +1,10 @@
+{
+  "library": "three",
+  "version": "0.187.0",
+  "source": "https://registry.npmjs.org/three/-/three-0.187.0.tgz",
+  "npmIntegrity": "sha512-Qiu7R+Cmh8CstZsY1uJOSWnVlfo7ZtNLV7mF8Jltk3LB3AtDu9cRZlcnRKkAk8Y4z6KKw35z7Y7Urd7jWY8etA==",
+  "bundleSHA256": "d59478ac9949ea8a70ee49493b833381569fa1ab2770ccceffcfd77bf3afc864",
+  "bundler": "esbuild 0.28.2",
+  "format": "iife",
+  "license": "MIT"
+}

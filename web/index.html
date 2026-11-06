@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'"><title>心晴 · 心情日历</title><link rel="stylesheet" href="style.css"><script src="vendor/three.min.js" defer></script><script src="model.js" defer></script><script src="physics.js" defer></script><script src="pet.js" defer></script><script src="app.js" defer></script></head>
+<body>
+<div class="app-shell">
+  <header class="topbar"><a class="wordmark" href="#" aria-label="心晴首页"><span class="brand-dot"></span>心晴<span class="wordmark-en">心情日历</span></a><div class="top-actions"><span class="local-label">只存在这台电脑里</span><button id="desktop" class="dark">放到桌面 <span aria-hidden="true">↗</span></button></div></header>
+  <main>
+    <section class="intro"><div><p class="eyebrow">给心情一个软着陆</p><h1>把今天，揉得软一点。</h1><p class="subtitle">它会呼吸，会看着你，也会记得今天的颜色。</p></div><div class="date-mark"><span id="date-label"></span><span id="weekday-label"></span></div></section>
+    <div id="warning" role="alert" hidden></div>
+    <div class="workspace">
+      <section class="companion" aria-label="心情史莱姆">
+        <div class="companion-top"><span class="section-label">我的小小陪伴</span><span id="current-label">还没有记录</span></div>
+        <div id="pet-host" class="pet-host"><canvas id="pet" tabindex="0" role="button" aria-label="心情史莱姆。按住压扁，拖动拉伸；按住空格压扁，松开回弹。桌面模式下右键打开菜单，按住 Option 拖动移动位置。"></canvas><p id="pet-reaction" role="status">你好，先摸摸我吧。</p></div>
+        <div class="pet-actions"><button id="squish">捏一下</button><button id="stroke">摸摸它</button><button id="import-skin" class="text-button">换个模样 <span aria-hidden="true">↗</span></button></div>
+        <p class="gesture-note">按住压扁 · 拖动拉伸 · 松手回弹</p>
+        <div class="mood-composer"><label class="section-label" for="note">此刻，我感觉</label><div id="mood-options" class="mood-options" role="group" aria-label="选择心情"></div><textarea id="note" rows="2" maxlength="280" placeholder="有什么想留下的吗？也可以什么都不写。" aria-label="心情留言，选填，最多280字符"></textarea><div class="composer-bottom"><span id="save-state" role="status">选一种心情，就可以记下这一刻。</span><button id="record" class="dark">记下此刻</button></div></div>
+        <div class="skin-detail"><span id="skin-label">原生小糯团</span><button id="reset-skin" class="text-button" hidden>恢复小糯团</button></div>
+      </section>
+      <section class="calendar-panel" aria-label="心情日历"><div class="calendar-heading"><div><p class="eyebrow">一天一颗，慢慢收藏</p><h2 id="month-label"></h2></div><div class="month-nav"><button id="prev-month" aria-label="上个月">‹</button><button id="today">今天</button><button id="next-month" aria-label="下个月">›</button></div></div><div class="weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div id="calendar" class="calendar" role="group" aria-label="选择日期"></div><div class="calendar-key"><span><i class="empty-key"></i>未记录</span><span>按已记录时段的时长配色</span></div>
+        <section class="day-detail"><div class="day-heading"><h3 id="day-label"></h3><span id="entry-count"></span></div><div class="time-axis" aria-label="24小时心情时间轴">
+  <div class="axis-top"><span>一天的颜色</span><output id="cursor-clock" for="time-cursor">00:00</output></div>
+  <div class="axis-track"><div id="time-segments" aria-hidden="true"></div><input id="time-cursor" type="range" min="0" max="1439" step="1" value="0" aria-label="按分钟查看当天心情" aria-describedby="time-rule"></div>
+  <div id="time-points" class="time-points" aria-label="心情变更记录点"></div>
+  <div class="axis-ticks" aria-hidden="true"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+  <div id="time-totals" class="time-totals" aria-label="已设置心情的时长"></div>
+  <p id="time-rule" class="time-rule">从设置起持续到下次修改；首次记录前留白。</p>
+  <div id="moment" class="moment" aria-live="polite"><span id="moment-mood"></span><span id="moment-range"></span><p id="moment-note"></p></div>
+</div>
+<details id="record-details"><summary>记录明细 <span id="detail-count"></span></summary><p id="recap" class="recap"></p><ol id="timeline" class="timeline"></ol></details><div id="empty-day" class="empty-day"><span class="empty-orbit" aria-hidden="true"></span><p>这一天，还没有留下颜色。</p><small>不必补齐每一天，想记录的时候再来。</small></div></section>
+      </section>
+    </div>
+    <footer><span>感受没有好坏，颜色也没有。</span><div><button id="export" class="text-button">导出记录</button><button id="storage" class="text-button">存档位置</button></div></footer>
+  </main>
+</div>
+<section id="mini-ui" aria-label="桌面心情小球" hidden><div id="mini-pet-slot"></div></section>
+<dialog id="skin-info"><form method="dialog"><div class="dialog-top"><h2>换一个模样</h2><button aria-label="关闭">×</button></div><p>导入你画的小怪物，或者一张喜欢的动图。</p><ul><li>支持 PNG、JPEG、WebP、GIF、APNG。</li><li>透明背景图片会保留角色轮廓。</li><li>动图最多 60 帧；文件不超过 15 MB。</li><li>导入后仍能压扁、拉伸和贴绷带。</li></ul><p class="muted">首版不读取 Lottie、视频或可执行皮肤脚本。</p><div class="dialog-actions"><button value="cancel">取消</button><button id="choose-skin" type="button" class="dark">选择文件</button></div></form></dialog>
+</body></html>
