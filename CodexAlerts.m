@@ -1,4 +1,5 @@
 #import "CodexAlerts.h"
+#import <sqlite3.h>
 
 @implementation CodexAlerts
 - (instancetype)initWithRoot:(NSURL *)root {
@@ -42,6 +43,38 @@
 }
 - (BOOL)poll {
     BOOL changed=NO;for(NSDictionary *event in [self readEvents])changed=[self accept:event]||changed;return changed;
+}
++ (NSURL *)readStateDatabase {
+    NSString *home=NSProcessInfo.processInfo.environment[@"CODEX_HOME"]?:[NSHomeDirectory() stringByAppendingPathComponent:@".codex"];
+    NSURL *root=[NSURL fileURLWithPath:home isDirectory:YES],*latest=nil;NSInteger version=-1;
+    for(NSURL *file in [NSFileManager.defaultManager contentsOfDirectoryAtURL:root includingPropertiesForKeys:nil options:NSDirectoryEnumerationSkipsHiddenFiles error:NULL]){
+        NSString *name=file.lastPathComponent;
+        if(![name hasPrefix:@"state_"]||![name hasSuffix:@".sqlite"]||name.length<=13)continue;
+        NSString *number=[name substringWithRange:NSMakeRange(6,name.length-13)];
+        if([number rangeOfCharacterFromSet:[[NSCharacterSet characterSetWithCharactersInString:@"0123456789"] invertedSet]].location!=NSNotFound)continue;
+        if(number.integerValue>version){version=number.integerValue;latest=file;}
+    }
+    return latest;
+}
++ (NSArray<NSString *> *)acknowledgedEvents:(NSArray<NSDictionary *> *)events database:(NSURL *)url {
+    if(!url||!events.count)return @[];
+    NSNumber *link=nil;[url getResourceValue:&link forKey:NSURLIsSymbolicLinkKey error:NULL];if(link.boolValue)return @[];
+    sqlite3 *db=NULL;sqlite3_stmt *query=NULL;NSMutableArray *ids=[NSMutableArray new];
+    if(sqlite3_open_v2(url.fileSystemRepresentation,&db,SQLITE_OPEN_READONLY|SQLITE_OPEN_NOMUTEX,NULL)!=SQLITE_OK){if(db)sqlite3_close(db);return @[];}
+    sqlite3_busy_timeout(db,100);
+    // Codex's local receipt schema is internal: unknown or missing data must preserve reminders.
+    if(sqlite3_prepare_v2(db,"SELECT first_unread_turn, last_published_turn FROM thread_read_receipts WHERE thread_id=?1",-1,&query,NULL)==SQLITE_OK){
+        for(NSDictionary *event in events){
+            if(![self validEvent:event]||![event[@"kind"] isEqual:@"completed"]||![event[@"turn"] length])continue;
+            sqlite3_bind_text(query,1,[event[@"thread"] UTF8String],-1,SQLITE_TRANSIENT);
+            if(sqlite3_step(query)==SQLITE_ROW&&sqlite3_column_type(query,0)==SQLITE_NULL&&sqlite3_column_type(query,1)==SQLITE_TEXT){
+                const char *published=(const char *)sqlite3_column_text(query,1);
+                if(published&&[event[@"turn"] isEqual:[NSString stringWithUTF8String:published]])[ids addObject:event[@"id"]];
+            }
+            sqlite3_reset(query);sqlite3_clear_bindings(query);
+        }
+    }
+    if(query)sqlite3_finalize(query);sqlite3_close(db);return ids;
 }
 - (NSArray<NSDictionary *> *)readEvents {
     NSNumber *symbolic=nil;[self.root getResourceValue:&symbolic forKey:NSURLIsSymbolicLinkKey error:NULL];if(symbolic.boolValue)return @[];

@@ -9,7 +9,8 @@
     {id:'tired', name:'疲惫', color:'#B7B1A4', ink:'#6D685C'},
     {id:'resigned', name:'无奈', color:'#C5B18C', ink:'#7B6846'},
     {id:'speechless', name:'无语', color:'#9CBABF', ink:'#4B7078'},
-    {id:'overwhelmed', name:'要死了', color:'#AAA6B5', ink:'#615D6C'}
+    {id:'overwhelmed', name:'要死了', color:'#AAA6B5', ink:'#615D6C'},
+    {id:'sleepy', name:'好困', color:'#91A2B8', ink:'#5D6471'}
   ];
   const moodById = Object.fromEntries(moods.map(m=>[m.id,m]));
   function dayKey(date = new Date()) {

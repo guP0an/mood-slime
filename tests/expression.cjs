@@ -20,5 +20,8 @@ for(let t=0;t<8;t+=.1){
 }
 assert(faceMotion('tired',.42).lid<.15,'tired eyes close slowly');
 assert(faceMotion('tired',1.2).lid>.85,'tired eyes reopen');
+assert(faceMotion('sleepy',.95).lid<.15,'sleepy has a long slow blink');
+assert(faceMotion('sleepy',1.5).lid>.7,'sleepy eyes reopen');
+assert(faceMotion('sleepy',2).mouth>1&&faceMotion('tired',2).mouth===1,'small sleepy yawn differs from tired slack mouth');
 assert(Object.values(faceMotion('anxious',NaN,Infinity,NaN,true)).every(Number.isFinite));
-console.log('PASS: nine continuous bounded eye motions, two-axis anxious scan, pointer attention, slow blink, reduced motion and invalid input');
+console.log('PASS: ten continuous bounded eye motions, two-axis anxious scan, pointer attention, slow blink, reduced motion and invalid input');

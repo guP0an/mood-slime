@@ -15,7 +15,7 @@ app.pet.draw();gl.readPixels(Math.floor(initialCanvas.width/2),Math.floor(initia
 check(pixel[3]>0,'3D pet is painted before any interaction');
 check(app.pet.mesh.geometry.attributes.position.count>2000&&app.pet.material.isMeshPhysicalMaterial,'real 3D mesh and physically lit material');
 check(document.getElementById('record').getBoundingClientRect().bottom<=innerHeight,'record action is visible without scrolling');
-check(document.querySelectorAll('.mood-option').length===9,'nine selectable moods include overwhelmed');
+check(document.querySelectorAll('.mood-option').length===10,'ten selectable moods include sleepy');
 check(Object.keys(app.snapshot().summaries).length>0,'missed midnights archived at launch');
 document.querySelector('.local-label').textContent='合成数据 · 集成自检';
 const before=app.snapshot().events.length;
@@ -101,10 +101,19 @@ check(app.mini&&document.body.classList.contains('mini'),'desktop mode enabled')
 check(canvas.getBoundingClientRect().width<350,'desktop canvas fits mini window');
 const initialMini=await native('testMenuInfo');
 check(initialMini.scale===.5&&initialMini.width===170&&initialMini.height===150,'desktop starts at the small 50 percent default');
+await showWindow();canvas.dataset.input='keyboard';canvas.focus({preventScroll:true});
+const desktopFocusDeadline=performance.now()+2000;
+while(document.activeElement!==canvas&&performance.now()<desktopFocusDeadline){canvas.focus({preventScroll:true});await wait(40);}
+check(document.activeElement===canvas,'desktop keyboard indicator requires actual canvas focus');
+check(getComputedStyle(canvas).outlineStyle==='none','desktop keyboard focus cannot paint a clipped line above the notification bubble');
+const focusSlot=document.getElementById('mini-pet-slot'),focusMark=getComputedStyle(focusSlot,'::after');
+check(focusMark.width==='4px','desktop keyboard focus retains a small corner indicator: '+JSON.stringify({width:focusMark.width,content:focusMark.content,input:canvas.dataset.input,active:document.activeElement===canvas,matches:focusSlot.matches(':has(canvas[data-input="keyboard"]:focus)'),body:document.body.className,windowFocus:document.hasFocus()}));
+canvas.dataset.input='pointer';canvas.blur();
 check(!document.querySelector('#mini-ui button')&&getComputedStyle(document.getElementById('pet-reaction')).clipPath==='inset(50%)','desktop has only the ball, with no color bar, labels or toolbar');
 const codexEventCount=app.snapshot().events.length;
 const alert=await native('testCodexAlert');
 check(alert.badgeVisible&&alert.safeChatURL,'native Codex badge supports attention and safe chat navigation');
+check(getComputedStyle(document.getElementById('mini-pet-slot')).paddingTop==='16px','desktop pet reserves 16px below the native notification badge');
 for(const [kind,label] of [['completed','Codex 有消息'],['question','小问题'],['approval','点头']]){
   const message=await native('testCodexAlert',{kind});
   check(message.badgeVisible&&message.badgeTitle.includes(label)&&message.fitsWindow,'cute '+kind+' notification is distinct and fits the small desktop window');
@@ -130,7 +139,7 @@ check(app.pet.body.settled,'body recovers after stretching before desktop rest s
 const menu=await native('testMenuInfo');
 const flatten=items=>items.flatMap(i=>[i,...flatten(i.children||[])]);
 const menuItems=flatten(menu.items);
-check(menuItems.filter(i=>i.command?.startsWith('mood:')).length===9,'native context menu exposes all nine moods');
+check(menuItems.filter(i=>i.command?.startsWith('mood:')).length===10,'native context menu exposes all ten moods');
 check(['follow','stroke','squish','move','skin','resetSkin','export','storage','calendar','hide','quit'].every(command=>menuItems.some(i=>i.command===command)),'native context menu exposes follow, interaction, settings and calendar actions');
 check(!menu.following,'cursor following is opt-in by default');
 check((await native('testMenuCommand',{command:'follow'})).ok,'native follow menu toggles on');
@@ -269,6 +278,7 @@ for(const mood of MoodModel.moods){
     check(app.pet.expressionEyes.every(e=>e.userData.parts.bag.visible)&&app.pet.exhaustedMouth.visible&&!app.pet.grin.visible,'fatigue uses heavy low eyelids, under-eye shading and a slack small mouth, without a permanent yawn');
     check(app.pet.group.scale.y<.93&&app.pet.group.scale.x>1&&app.pet.group.position.y<0,'exhaustion has a grounded slouched silhouette instead of a sleepy upright pose');
   }
+  if(mood.id==='sleepy')check(app.pet.sleepyMouth.visible&&app.pet.sleepMarks.length===2&&app.pet.sleepMarks.every(z=>z.visible)&&!app.pet.exhaustedMouth.visible&&app.pet.expressionEyes.every(e=>e.visible&&!e.userData.parts.bag.visible&&e.userData.parts.glints.every(g=>!g.visible)&&e.userData.profile.height/e.userData.profile.width<.4)&&app.pet.color.getHexString()==='7892ac','approved sleepy B has narrow half-open eyes, a pink yawn, two Z marks and the selected dusty blue');
   if(mood.id==='calm')check(app.pet.expressionEyes.every(e=>e.visible)&&app.pet.glasses.every(g=>g.visible)&&app.pet.catMouth.visible,'calm has clear eyes behind slim black 3D glasses');
   if(mood.id==='anxious')check(app.pet.expressionEyes.every(e=>e.visible)&&app.pet.worriedMouth.visible,'anxiety has independently movable pupils and a wavy mouth');
   if(mood.id==='sad')check(app.pet.expressionEyes.every(e=>e.userData.parts.pool.visible)&&app.pet.tearDrops.every(e=>e.visible),'sadness has large watery eyes and two teardrops');
@@ -291,7 +301,8 @@ for(const mood of MoodModel.moods){
   }
   check((await native('testSnapshot',{name:'mood-'+mood.id+'.png'})).ok,'expression reference screenshot '+mood.id);
 }
-check(eyeKinds.size===9,'all nine states have distinct eye acting');
+check(eyeKinds.size===10,'all ten states have distinct eye acting');
+app.pet.setMood('overwhelmed');app.pet.draw();
 const ropePosition=app.pet.group.position.clone(),ropeClock=app.pet.clock,ropeReduced=app.pet.reduced;
 app.pet.clock+=1;app.pet.draw();
 check(app.pet.reduced.matches||app.pet.group.position.distanceTo(ropePosition)>.001,'hanging ball gently moves over rendered time');
@@ -307,13 +318,17 @@ const gazeSamples=[];
 for(let i=0;i<6;i++){await wait(260);gazeSamples.push([app.pet.eyeGaze.x,app.pet.eyeGaze.y]);const frame=await native('testSnapshot',{name:'gaze-'+i+'.png'});check(frame.ok&&!frame.skipped,'actual animated gaze frame '+i);}
 check(app.pet.reduced.matches||Math.max(...gazeSamples.map(p=>p[0]))-Math.min(...gazeSamples.map(p=>p[0]))>.25,'anxious pupils scan horizontally over real rendered frames');
 check(app.pet.reduced.matches||Math.max(...gazeSamples.map(p=>p[1]))-Math.min(...gazeSamples.map(p=>p[1]))>.15,'anxious pupils scan vertically over real rendered frames');
-app.pet.lookAtDesktop(1,0);await wait(280);
+app.pet.lookAtDesktop(1,0);
+const rightGazeDeadline=performance.now()+1200;
+while(!app.pet.reduced.matches&&!app.pet.expressionEyes.every(e=>e.userData.parts.pupil.position.x>0)&&performance.now()<rightGazeDeadline)await wait(40);
 check(app.pet.reduced.matches||app.pet.expressionEyes.every(e=>e.userData.parts.pupil.position.x>0),'anxious eyes attend to a pointer on the right: '+JSON.stringify({gaze:app.pet.eyeGaze.toArray(),target:app.pet.lookTarget.toArray(),clock:app.pet.clock,attentionUntil:app.pet.attentionUntil,held:!!app.pet.body.hold,hidden:document.hidden,pupils:app.pet.expressionEyes.map(e=>e.userData.parts.pupil.position.x)}));
-app.pet.lookAtDesktop(-1,0);await wait(280);
+app.pet.lookAtDesktop(-1,0);
+const leftGazeDeadline=performance.now()+1200;
+while(!app.pet.reduced.matches&&!app.pet.expressionEyes.every(e=>e.userData.parts.pupil.position.x<0)&&performance.now()<leftGazeDeadline)await wait(40);
 check(app.pet.reduced.matches||app.pet.expressionEyes.every(e=>e.userData.parts.pupil.position.x<0),'anxious eyes follow a pointer back to the left');
 app.pet.lookTarget.set(0,0);app.pet.attentionUntil=0;
 
-for(const [mood,label] of [['resigned','无奈'],['speechless','无语'],['overwhelmed','要死了']]){
+for(const [mood,label] of [['resigned','无奈'],['speechless','无语'],['overwhelmed','要死了'],['sleepy','好困']]){
   const count=app.snapshot().events.length;
   check((await native('testMenuCommand',{command:'mood:'+mood})).ok,'native menu saves new mood '+mood);
   check(app.snapshot().events.length===count+1&&app.snapshot().events.at(-1).mood===mood,'new mood survives native persistence '+mood);

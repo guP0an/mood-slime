@@ -8,6 +8,9 @@ static BOOL MoodShouldDrag(BOOL forced,NSEventModifierFlags flags) {
 static BOOL MoodShouldFollow(BOOL enabled,BOOL desktop,BOOL visible,BOOL paused,NSUInteger buttons) {
     return enabled&&desktop&&visible&&!paused&&buttons==0;
 }
+static BOOL MoodShouldTransferDisplay(BOOL following,BOOL currentAvailable) {
+    return following||!currentAvailable;
+}
 static NSPoint MoodTransferScreen(NSRect frame,NSRect oldVisible,NSRect newVisible) {
     CGFloat rx=(frame.origin.x-oldVisible.origin.x)/MAX(1,oldVisible.size.width-frame.size.width);
     CGFloat ry=(frame.origin.y-oldVisible.origin.y)/MAX(1,oldVisible.size.height-frame.size.height);

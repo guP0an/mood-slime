@@ -6,6 +6,9 @@ int main(void){@autoreleasepool{
     assert(!MoodShouldDrag(NO,0));assert(!MoodShouldDrag(NO,NSEventModifierFlagShift));assert(MoodShouldDrag(NO,NSEventModifierFlagOption));
     assert(!MoodShouldDrag(NO,NSEventModifierFlagControl));assert(MoodShouldDrag(YES,NSEventModifierFlagShift));
     assert(MoodShouldFollow(YES,YES,YES,NO,0));
+    assert(!MoodShouldTransferDisplay(NO,YES));
+    assert(MoodShouldTransferDisplay(YES,YES));
+    assert(MoodShouldTransferDisplay(NO,NO));
     assert(!MoodShouldFollow(NO,YES,YES,NO,0));assert(!MoodShouldFollow(YES,NO,YES,NO,0));
     assert(!MoodShouldFollow(YES,YES,NO,NO,0));assert(!MoodShouldFollow(YES,YES,YES,YES,0));assert(!MoodShouldFollow(YES,YES,YES,NO,1));
     for(int edge=0;edge<5;edge++){

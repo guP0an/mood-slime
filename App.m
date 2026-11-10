@@ -234,7 +234,7 @@
         }
         [self reply:identifier value:@{@"shown":@(self.messagePopover.shown),@"paused":@(self.menuOpen),@"labels":labels,@"textFits":@(fits)}];return;
     }
-    if(self.testing&&[action isEqual:@"testDismissCodexAlert"]){[self.codexAlerts.items removeAllObjects];[self refreshCodexButton];[self reply:identifier value:@{@"ok":@(self.codexButton.hidden)}];return;}
+    if(self.testing&&[action isEqual:@"testDismissCodexAlert"]){[self clearCodexMessages:nil];[self reply:identifier value:@{@"ok":@(self.codexButton.hidden)}];return;}
     if(self.testing&&[action isEqual:@"testFullScreenOverlay"]){
         NSURL *fixture=[[NSBundle.mainBundle.bundleURL URLByDeletingLastPathComponent] URLByAppendingPathComponent:@"OverlayFixture.app"];
         NSURL *output=[self.testRoot URLByAppendingPathComponent:@"fullscreen-result.json"];
@@ -281,7 +281,7 @@
     NSMenuItem *moods=[[NSMenuItem alloc] initWithTitle:@"换个心情并记录" action:nil keyEquivalent:@""];
     NSMenu *choices=[NSMenu new];choices.autoenablesItems=NO;
     NSDictionary *state=self.store.state;NSString *current=[state[@"events"] lastObject][@"mood"];
-    for(NSArray *entry in @[@[@"平静",@"calm"],@[@"开心",@"happy"],@[@"难过",@"sad"],@[@"焦虑",@"anxious"],@[@"烦躁",@"angry"],@[@"疲惫",@"tired"],@[@"无奈",@"resigned"],@[@"无语",@"speechless"],@[@"要死了",@"overwhelmed"]]){
+    for(NSArray *entry in @[@[@"平静",@"calm"],@[@"开心",@"happy"],@[@"难过",@"sad"],@[@"焦虑",@"anxious"],@[@"烦躁",@"angry"],@[@"疲惫",@"tired"],@[@"无奈",@"resigned"],@[@"无语",@"speechless"],@[@"要死了",@"overwhelmed"],@[@"好困",@"sleepy"]]){
         NSMenuItem *item=[self menuItem:entry[0] command:[@"mood:" stringByAppendingString:entry[1]]];
         item.state=[entry[1] isEqual:current]?NSControlStateValueOn:NSControlStateValueOff;
         item.enabled=!self.store.readOnly&&self.pendingIO==0;[choices addItem:item];
@@ -384,7 +384,11 @@
 }
 - (void)checkCodexMessages {
     if(self.alertPolling)return;self.alertPolling=YES;
-    dispatch_async(self.io,^{NSArray *events=[self.codexAlerts readEvents];dispatch_async(dispatch_get_main_queue(),^{self.alertPolling=NO;BOOL changed=NO;for(NSDictionary *event in events)changed=[self.codexAlerts accept:event]||changed;if(changed)[self refreshCodexButton];});});
+    NSArray *pending=[self.codexAlerts.items copy];
+    dispatch_async(self.io,^{NSArray *events=[self.codexAlerts readEvents];NSArray *read=[CodexAlerts acknowledgedEvents:pending database:[CodexAlerts readStateDatabase]];
+        dispatch_async(dispatch_get_main_queue(),^{self.alertPolling=NO;BOOL changed=NO;for(NSDictionary *event in events)changed=[self.codexAlerts accept:event]||changed;
+            for(NSString *identifier in read){NSUInteger before=self.codexAlerts.items.count;[self.codexAlerts dismiss:identifier];changed|=before!=self.codexAlerts.items.count;}
+            if(changed)[self refreshCodexButton];});});
 }
 - (NSViewController *)codexMessageContent {
     NSUInteger count=self.codexAlerts.items.count;
@@ -420,8 +424,12 @@
     if(!count){NSTextField *empty=[NSTextField labelWithString:@"小耳朵竖好啦，等新消息"];
         empty.font=[NSFont systemFontOfSize:12];empty.textColor=NSColor.secondaryLabelColor;empty.frame=NSMakeRect(8,22,192,18);[list addSubview:empty];}
     NSTextField *hint=[NSTextField labelWithString:count?@"点开纸条，回到对应聊天 ↗":@"有新消息时，我会告诉你"];
-    hint.font=[NSFont systemFontOfSize:10];hint.textColor=NSColor.secondaryLabelColor;hint.frame=NSMakeRect(18,9,202,14);[root addSubview:hint];
+    hint.font=[NSFont systemFontOfSize:10];hint.textColor=NSColor.secondaryLabelColor;hint.frame=NSMakeRect(18,9,count?170:202,14);[root addSubview:hint];
+    if(count){NSButton *clear=[NSButton buttonWithTitle:@"都看过了" target:self action:@selector(clearCodexMessages:)];clear.bordered=NO;clear.font=[NSFont systemFontOfSize:11];clear.frame=NSMakeRect(194,5,72,22);[root addSubview:clear];}
     return controller;
+}
+- (void)clearCodexMessages:(id)sender {
+    [self.codexAlerts.items removeAllObjects];[self.messagePopover performClose:nil];[self refreshCodexButton];
 }
 - (void)showCodexMessages:(id)sender {
     if(self.messagePopover.shown){[self.messagePopover performClose:nil];return;}
@@ -441,11 +449,14 @@
 }
 - (void)keepOnPointerScreen {
     if(!self.desktop||self.dragging||self.menuOpen||NSEvent.pressedMouseButtons||NSApp.hidden)return;
+    BOOL currentAvailable=NO;
+    for(NSScreen *screen in NSScreen.screens)if(NSIntersectsRect(self.window.frame,screen.visibleFrame)){currentAvailable=YES;break;}
+    if(!MoodShouldTransferDisplay(self.following,currentAvailable))return;
     NSScreen *target=nil;NSPoint pointer=NSEvent.mouseLocation;
     for(NSScreen *screen in NSScreen.screens)if(NSPointInRect(pointer,screen.frame)){target=screen;break;}
     if(!target)target=NSScreen.mainScreen;if(!target)return;
     NSString *identifier=[target.deviceDescription[@"NSScreenNumber"] description];
-    if([identifier isEqual:self.displayID])return;
+    if(currentAvailable&&[identifier isEqual:self.displayID])return;
     NSRect previous=(self.window.screen?:target).visibleFrame,frame=self.window.frame;
     frame=MoodDesktopFrame(frame,target.visibleFrame,self.desktopScale);
     frame.origin=MoodTransferScreen(self.window.frame,previous,target.visibleFrame);
@@ -614,7 +625,7 @@
         BOOL ok=png&&[png writeToURL:[self.artifacts URLByAppendingPathComponent:name] options:NSDataWritingAtomic error:NULL];
         [self reply:identifier value:@{@"ok":@(ok)}];return;
     }
-    if(!self.artifacts||![@[@"calendar.png",@"squashed.png",@"stretch.png",@"desktop.png",@"rolling.png",@"happy-bandaged.png",@"time-axis.png",@"skin.png",@"mood-calm.png",@"mood-happy.png",@"mood-sad.png",@"mood-angry.png",@"mood-anxious.png",@"mood-tired.png",@"mood-resigned.png",@"mood-speechless.png",@"mood-overwhelmed.png",@"gaze-0.png",@"gaze-1.png",@"gaze-2.png",@"gaze-3.png",@"gaze-4.png",@"gaze-5.png"] containsObject:name]){[self reply:identifier value:@{@"ok":@YES,@"skipped":@YES}];return;}
+    if(!self.artifacts||![@[@"calendar.png",@"squashed.png",@"stretch.png",@"desktop.png",@"rolling.png",@"happy-bandaged.png",@"time-axis.png",@"skin.png",@"mood-calm.png",@"mood-happy.png",@"mood-sad.png",@"mood-angry.png",@"mood-anxious.png",@"mood-tired.png",@"mood-resigned.png",@"mood-speechless.png",@"mood-overwhelmed.png",@"mood-sleepy.png",@"gaze-0.png",@"gaze-1.png",@"gaze-2.png",@"gaze-3.png",@"gaze-4.png",@"gaze-5.png"] containsObject:name]){[self reply:identifier value:@{@"ok":@YES,@"skipped":@YES}];return;}
     [NSFileManager.defaultManager createDirectoryAtURL:self.artifacts withIntermediateDirectories:YES attributes:nil error:NULL];
     WKSnapshotConfiguration *configuration=[WKSnapshotConfiguration new];configuration.afterScreenUpdates=YES;
     [self.web takeSnapshotWithConfiguration:configuration completionHandler:^(NSImage *image,NSError *error){NSBitmapImageRep *bitmap=image?[[NSBitmapImageRep alloc] initWithData:image.TIFFRepresentation]:nil;NSData *png=[bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}];BOOL ok=png&&[png writeToURL:[self.artifacts URLByAppendingPathComponent:name] options:NSDataWritingAtomic error:NULL];[self reply:identifier value:@{@"ok":@(ok),@"error":error.localizedDescription?:@""}];}];

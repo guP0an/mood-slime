@@ -168,8 +168,22 @@
       this.heart=this.feature(new T.Mesh(new T.ExtrudeGeometry(heart,{depth:.025,bevelEnabled:true,bevelSize:.012,bevelThickness:.012,bevelSegments:2,steps:1}),new T.MeshStandardMaterial({color:0xE6A2A0,roughness:.4})),.65,.8,.1);
       this.heart.visible=false;
       this.setupApprovedFace();
+      const sleepyLip=new T.Shape();sleepyLip.absellipse(0,0,.058,.043,0,Math.PI*2,false);
+      this.sleepyMouth=this.feature(this.faceShape(sleepyLip,new T.MeshBasicMaterial({color:0xB9858E,toneMapped:false}),.0045),.01,-.15,.065);
+      const sleepyTongue=new T.Mesh(new T.SphereGeometry(1,18,12),new T.MeshBasicMaterial({color:0xEDBCC0,toneMapped:false}));
+      sleepyTongue.scale.set(.045,.017,.009);sleepyTongue.position.set(0,-.017,.024);this.sleepyMouth.add(sleepyTongue);
+      this.sleepMarks=[];
+      const z=new T.CurvePath();
+      z.add(new T.LineCurve3(new T.Vector3(-.045,.055,0),new T.Vector3(.045,.055,0)));
+      z.add(new T.LineCurve3(new T.Vector3(.045,.055,0),new T.Vector3(-.045,-.055,0)));
+      z.add(new T.LineCurve3(new T.Vector3(-.045,-.055,0),new T.Vector3(.045,-.055,0)));
+      const zMaterial=new T.MeshBasicMaterial({color:0x9A8488,toneMapped:false});
+      for(let i=0;i<2;i++){
+        const mark=this.feature(new T.Mesh(new T.TubeGeometry(z,24,.007,8,false),zMaterial),.65+i*.2,.67+i*.2,.045);
+        mark.userData.baseScale=i?[1.4,1.4,1]:[.95,.95,1];this.sleepMarks.push(mark);
+      }
       for(const feature of this.features){
-        if(feature!==this.heart&&feature!==this.question)feature.userData.facePart=true;
+        if(feature!==this.heart&&feature!==this.question&&!this.sleepMarks.includes(feature))feature.userData.facePart=true;
         // Keep foreground features out of the opaque refraction pass to avoid duplicate faces.
         feature.traverse(object=>{if(object.material)object.material.transparent=true;});
       }
@@ -230,12 +244,13 @@
     setApprovedEyeMood(mood) {
       if(!this.expressionEyes||this.eyeMood===mood)return;
       this.eyeMood=mood;
-      const profiles={calm:[.12,.135,.047,.073,0],happy:[.145,.165,.04,.052,.06],sad:[.14,.165,.075,.105,0],anxious:[.15,.18,.034,.047,0],tired:[.145,.10,.047,.034,-.018],resigned:[.13,.16,.041,.055,.025],speechless:[.15,.078,0,0,0],overwhelmed:[.215,.165,.059,.050,.040]};
+      const profiles={calm:[.12,.135,.047,.073,0],happy:[.145,.165,.04,.052,.06],sad:[.14,.165,.075,.105,0],anxious:[.15,.18,.034,.047,0],tired:[.145,.10,.047,.034,-.018],resigned:[.13,.16,.041,.055,.025],speechless:[.15,.078,0,0,0],overwhelmed:[.215,.165,.059,.050,.040],sleepy:[.18,.068,.030,.022,-.02]};
       const [w,h,px,py,baseY]=profiles[mood]||profiles.calm;
       for(const eye of this.expressionEyes){
         const side=eye.userData.side,parts=eye.userData.parts,shape=new T.Shape();
         const width=mood==='anxious'&&side>0?w*.8:w,height=mood==='anxious'&&side>0?h*.8:mood==='resigned'&&side>0?h*.8:h;
-        if(mood==='tired'){shape.moveTo(-width,.035);shape.lineTo(width,.035);shape.bezierCurveTo(width,-height*1.3,-width,-height*1.3,-width,.035);}
+        if(mood==='sleepy'){shape.moveTo(-width,.006);shape.quadraticCurveTo(0,-.012,width,.018);shape.quadraticCurveTo(0,-height*1.6,-width,.006);}
+        else if(mood==='tired'){shape.moveTo(-width,.035);shape.lineTo(width,.035);shape.bezierCurveTo(width,-height*1.3,-width,-height*1.3,-width,.035);}
         else shape.absellipse(0,0,width,height,0,Math.PI*2,false);
         if(parts.shell){eye.remove(parts.shell);parts.shell.traverse(node=>node.geometry?.dispose());}
         parts.shell=this.faceShape(shape,this.eyeWhite);eye.add(parts.shell);
@@ -345,7 +360,7 @@
     setMood(mood) {
       if(this.mood!==mood)this.moodChangedAt=this.clock;
       this.mood=mood;
-      const colors={calm:'#79B994',happy:'#FFDA70',sad:'#79A9D2',anxious:'#A68ACB',angry:'#D97E69',tired:'#9B8DB2',resigned:'#BEA16F',speechless:'#79AFB8',overwhelmed:'#9D96AA'};
+      const colors={calm:'#79B994',happy:'#FFDA70',sad:'#79A9D2',anxious:'#A68ACB',angry:'#D97E69',tired:'#9B8DB2',resigned:'#BEA16F',speechless:'#79AFB8',overwhelmed:'#9D96AA',sleepy:'#7892AC'};
       this.color.set(colors[mood]||colors.calm);
       window.webkit?.messageHandlers?.mood?.postMessage({id:0,action:'petTint',color:colors[mood]||colors.calm});
       if(this.material)this.material.color.copy(this.color);
@@ -397,6 +412,7 @@
       const motion=SlimePhysics.faceMotion(this.mood,this.clock,this.lookTarget.x/.3,this.lookTarget.y/.15,this.clock<this.attentionUntil,this.reduced.matches||!!this.body.hold);
       const cheekRaise=laugh?.09+(motion.mouth-1)*.12:happy?.035:angry?.025:0;
       for(const cheek of this.cheeks){cheek.userData.anchor.v=-.015+cheekRaise;cheek.visible=!this.image&&!['happy','speechless','overwhelmed'].includes(this.mood);}
+      for(const cheek of this.cheeks)cheek.material.opacity=this.mood==='sleepy'?.38:1;
       const xAxis=new T.Vector3(),yAxis=new T.Vector3(),normal=new T.Vector3(),basis=new T.Matrix4();
       for(const feature of this.features) {
         const anchor=feature.userData.anchor,faceScale=feature.userData.facePart&&this.mood!=='angry'?1.42:1;
@@ -418,8 +434,8 @@
         eye.visible=!this.image&&!hurt&&!laugh&&!angry;eye.scale.y*=vacant?1:motion.lid;
         const marginX=Math.max(0,p.width*.65-p.pupilWidth),marginY=Math.max(0,p.height*.75-p.pupilHeight);
         const x=vacant?-.012:this.eyeGaze.x*marginX,y=vacant?p.baseY:Math.max(-marginY,Math.min(marginY,p.baseY+this.eyeGaze.y*marginY));
-        parts.pupil.position.set(x,y,.033);parts.pupil.visible=this.mood!=='speechless';
-        parts.glints.forEach((g,i)=>{g.visible=!vacant&&this.mood!=='speechless';g.position.set(x+(i?1:-1)*p.pupilWidth*.35,y+(i?-1:1)*p.pupilHeight*.4,.06);});
+        parts.pupil.position.set(this.mood==='sleepy'?Math.max(-.07,Math.min(.07,x)):x,y,.033);parts.pupil.visible=this.mood!=='speechless';
+        parts.glints.forEach((g,i)=>{g.visible=!vacant&&!['speechless','sleepy'].includes(this.mood);g.position.set(x+(i?1:-1)*p.pupilWidth*.35,y+(i?-1:1)*p.pupilHeight*.4,.06);});
       }
       this.glasses.forEach(g=>g.visible=!this.image&&!hurt&&this.mood==='calm');
       this.grin.visible=!this.image&&laugh;this.grin.scale.y*=motion.mouth*.75;
@@ -429,12 +445,13 @@
       if(this.question.visible&&!this.reduced.matches){this.question.position.y+=Math.sin(this.clock*1.3)*.018;this.question.rotateZ(Math.sin(this.clock*.9)*.04);}
       this.happyEyes.forEach(eye=>{eye.visible=laugh;eye.scale.x*=1.35;eye.scale.y*=1.15+(motion.mouth-1);});
       this.hurtEyes.forEach(eye=>eye.visible=hurt);this.tear.visible=hurt&&this.injury>.5;
-      this.brows.forEach((brow,i)=>{brow.visible=!hurt&&['calm','happy','sad','angry','anxious','tired','resigned','speechless','overwhelmed'].includes(this.mood);const side=i===0?1:-1;
+      this.brows.forEach((brow,i)=>{brow.visible=!hurt&&['calm','happy','sad','angry','anxious','tired','resigned','speechless','overwhelmed','sleepy'].includes(this.mood);const side=i===0?1:-1;
         brow.material=happy?this.joyInk:angry?this.dark:this.faceInk;
-        const tilt=this.mood==='angry'?-.62:this.mood==='tired'?.23:this.mood==='anxious'?.2:this.mood==='resigned'?.45:this.mood==='speechless'?(i?.22:0):this.mood==='overwhelmed'?(i?.18:0):['calm','happy'].includes(this.mood)?0:.34;
+        const tilt=this.mood==='angry'?-.62:this.mood==='sleepy'?(i?.08:-.12):this.mood==='tired'?.23:this.mood==='anxious'?.2:this.mood==='resigned'?.45:this.mood==='speechless'?(i?.22:0):this.mood==='overwhelmed'?(i?.18:0):['calm','happy'].includes(this.mood)?0:.34;
         if(!angry)brow.position.y+=motion.brow*.035*(i?1:-1);
         brow.quaternion.multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0,0,1),tilt*side));
         if(this.mood==='overwhelmed'){brow.scale.x*=1.25;brow.position.y+=i?.1:-.02;}
+        if(this.mood==='sleepy'){brow.position.y+=i?.035:-.035;brow.scale.y*=.75;}
         if(happy){brow.scale.x*=1.2;brow.scale.y*=1.3;}
         if(angry){brow.scale.x*=1.18;brow.scale.y*=1.8;}
       });
@@ -443,6 +460,10 @@
       this.catMouth.visible=!hurt&&!laugh&&this.mood==='calm';this.overwhelmedMouth.visible=!hurt&&this.mood==='overwhelmed';this.worriedMouth.visible=!hurt&&this.mood==='anxious';
       this.mouth.visible=hurt||this.mood==='sad';
       this.exhaustedMouth.visible=exhausted;
+      const drowsy=!this.image&&!hurt&&this.mood==='sleepy';
+      this.sleepyMouth.visible=drowsy;this.sleepyMouth.scale.y*=motion.mouth;
+      this.sleepMarks.forEach((mark,i)=>{mark.visible=drowsy;if(drowsy&&!this.reduced.matches){mark.position.y+=Math.sin(this.clock*.7+i)*.022;mark.rotateZ(.1);}});
+
       this.grittedMouth.visible=angry;this.teeth.forEach(t=>t.visible=angry);this.angryEyes.forEach(e=>e.visible=angry);this.angryPupils.forEach(e=>e.visible=angry);
       this.facialState={mood:this.mood,hurt,laugh,exhausted,cheekRaise,angry,motion};
       this.heart.visible=(this.heartUntil||0)>this.clock;
@@ -475,15 +496,16 @@
       }
       const expressive=!this.reduced.matches&&!this.body.hold;
       const joy=expressive&&this.facialState?.laugh?Math.sin(this.clock*8)*.014:0;
-      const breath=!expressive?0:Math.sin(this.clock*(this.mood==='tired'?1.25:2.05))*.016+joy;
+      const breath=!expressive?0:Math.sin(this.clock*(['tired','sleepy'].includes(this.mood)?1.25:2.05))*.016+joy;
       const slouch=this.facialState?.exhausted&&!this.body.hold;
       const suspended=!this.image&&this.mood==='overwhelmed'&&!this.body.hold&&!this.rolling.moving;
-      this.group.scale.set((1-breath*.5)*(slouch?1.055:1),(1+breath)*(slouch?.88:1.12),(1-breath*.5)*(slouch?1.035:1));
-      this.group.position.y=-.78*(1-(slouch?.88:1.12));
+      const sleepyPose=this.mood==='sleepy'&&!this.body.hold,bodyY=slouch?.88:sleepyPose?1.02:1.12;
+      this.group.scale.set((1-breath*.5)*(slouch?1.055:sleepyPose?1.05:1),(1+breath)*bodyY,(1-breath*.5)*(slouch?1.035:1));
+      this.group.position.y=-.78*(1-bodyY);
       this.group.position.x=0;
       this.group.rotation.y=this.reduced.matches?0:this.look.x+Math.sin(this.clock*.64)*.055;
-      this.group.rotation.x=this.reduced.matches?0:-this.look.y;
-      const tilt=this.mood==='sad'?-.045:this.mood==='tired'?.06:this.mood==='anxious'?.035:this.mood==='resigned'?-.065:0;
+      this.group.rotation.x=this.reduced.matches?0:-this.look.y+(sleepyPose?Math.sin(this.clock*.7)*.035:0);
+      const tilt=this.mood==='sleepy'?-.09:this.mood==='sad'?-.045:this.mood==='tired'?.06:this.mood==='anxious'?.035:this.mood==='resigned'?-.065:0;
       this.group.rotation.z=(!expressive?0:tilt+Math.sin(this.clock*.82)*.022+joy*.8+(this.facialState?.angry?Math.sin(this.clock*11)*.006:0))+(this.reduced.matches?0:this.rolling.angle);
       if(suspended){this.group.position.y+=.16;this.group.position.x=-Math.sin(this.group.rotation.z)*.55;}
       if(this.rolling.moving){

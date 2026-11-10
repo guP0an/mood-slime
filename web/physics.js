@@ -106,10 +106,11 @@
       brow=Math.sin(t*4.1)*.3;mouth=1+Math.sin(t*3.3)*.1;
     } else if(mood==='happy'){brow=Math.sin(t*5)*.24;mouth=1+Math.sin(t*5)*.06;}
     else if(mood==='sad'){y-=.3;brow=Math.sin(t*.8)*.14;mouth=1+Math.sin(t*1.2)*.04;}
+    else if(mood==='sleepy'){x*=.28;y=-.18;lid=.82+Math.sin(t*.6)*.12;mouth=.85+Math.pow(Math.max(0,Math.sin(t*.75)),4)*.25;brow=Math.sin(t*.6)*.08;}
     else if(mood==='tired'){y-=.22;lid=.9+Math.sin(t*.9)*.09;brow=-.12;}
     else if(mood==='resigned'){if(!attending){x=Math.sin(t*.65)*.52;y=.35+Math.sin(t*.7)*.1;}mouth=1+Math.sin(t*1.4)*.18;brow=Math.sin(t*.7)*.16;}
     else if(mood==='overwhelmed'){x*=.25;y*=.25;brow=Math.sin(t*3)*.18;mouth=1+Math.sin(t)*.08;}
-    const phase=t%(mood==='tired'?7.4:5.7),center=mood==='tired'?.42:.18,width=mood==='tired'?.18:.065;
+    const phase=t%(mood==='sleepy'?6.6:mood==='tired'?7.4:5.7),center=mood==='sleepy'?.95:mood==='tired'?.42:.18,width=mood==='sleepy'?.38:mood==='tired'?.18:.065;
     lid*=1-.92*Math.exp(-Math.pow((phase-center)/width,2));
     return {x:clamp(x,-1,1),y:clamp(y,-1,1),lid:clamp(lid,.06,1.1),brow,mouth};
   }

@@ -9,7 +9,7 @@ static BOOL String(id v,NSUInteger limit) {return [v isKindOfClass:NSString.clas
 static BOOL Number(id v,double minimum,double maximum) {return [v isKindOfClass:NSNumber.class]&&CFGetTypeID((__bridge CFTypeRef)v)!=CFBooleanGetTypeID()&&isfinite([v doubleValue])&&[v doubleValue]>=minimum&&[v doubleValue]<=maximum;}
 static BOOL Integer(id v,double minimum,double maximum) {return Number(v,minimum,maximum)&&floor([v doubleValue])==[v doubleValue];}
 static BOOL Day(id value) {if(!String(value,10)||[value length]!=10)return NO;NSDateFormatter *f=[NSDateFormatter new];f.locale=[[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];f.dateFormat=@"yyyy-MM-dd";f.lenient=NO;NSDate *d=[f dateFromString:value];return d&&[[f stringFromDate:d] isEqual:value];}
-static BOOL Mood(id value) {return String(value,12)&&[@[@"calm",@"happy",@"sad",@"anxious",@"angry",@"tired",@"resigned",@"speechless",@"overwhelmed"] containsObject:value];}
+static BOOL Mood(id value) {return String(value,12)&&[@[@"calm",@"happy",@"sad",@"anxious",@"angry",@"tired",@"resigned",@"speechless",@"overwhelmed",@"sleepy"] containsObject:value];}
 
 @implementation MoodStore
 - (instancetype)initWithRoot:(NSURL *)root {if((self=[super init]))self.root=root;return self;}
@@ -24,7 +24,7 @@ static BOOL Mood(id value) {return String(value,12)&&[@[@"calm",@"happy",@"sad",
     }
     for(id key in v[@"summaries"]) {
         id s=v[@"summaries"][key];
-        if(!Day(key)||![s isKindOfClass:NSDictionary.class]||![s[@"day"] isEqual:key]||!Integer(s[@"generatedAt"],0,8640000000000000.)||!String(s[@"text"],1000)||![s[@"counts"] isKindOfClass:NSArray.class]||[s[@"counts"] count]>9)return NO;
+        if(!Day(key)||![s isKindOfClass:NSDictionary.class]||![s[@"day"] isEqual:key]||!Integer(s[@"generatedAt"],0,8640000000000000.)||!String(s[@"text"],1000)||![s[@"counts"] isKindOfClass:NSArray.class]||[s[@"counts"] count]>10)return NO;
         for(id c in s[@"counts"])if(![c isKindOfClass:NSDictionary.class]||!Mood(c[@"mood"])||!Integer(c[@"count"],1,50000))return NO;
     }
     id skin=v[@"skin"];
@@ -151,16 +151,16 @@ BOOL RunStorageTests(void) {
     NSURL *invalid=[root URLByAppendingPathComponent:@"fake.png"];[@"<script>invalid</script>" writeToURL:invalid atomically:YES encoding:NSUTF8StringEncoding error:NULL];CHECK(![s importImage:invalid error:&error],"reject fake image contents");}
     {MoodStore *eight=[[MoodStore alloc] initWithRoot:[root URLByAppendingPathComponent:@"eight-moods"]];[eight load];
     NSMutableDictionary *state=[EmptyState() mutableCopy];NSMutableArray *events=[NSMutableArray new],*counts=[NSMutableArray new];
-    for(NSString *mood in @[@"calm",@"happy",@"sad",@"anxious",@"angry",@"tired",@"resigned",@"speechless",@"overwhelmed"]){
+    for(NSString *mood in @[@"calm",@"happy",@"sad",@"anxious",@"angry",@"tired",@"resigned",@"speechless",@"overwhelmed",@"sleepy"]){
         [events addObject:@{@"id":[@"synthetic-" stringByAppendingString:mood],@"mood":mood,@"at":@1793750400000,@"day":@"2026-11-04",@"note":@"synthetic",@"offset":@(-480)}];
         [counts addObject:@{@"mood":mood,@"count":@1}];
     }
     state[@"events"]=events;state[@"summaries"]=@{@"2026-11-04":@{@"day":@"2026-11-04",@"generatedAt":@1793836800000,@"text":@"synthetic eight-mood recap",@"counts":counts}};
-    CHECK([eight save:state error:&error],"nine mood events and recap persist");
+    CHECK([eight save:state error:&error],"ten mood events and recap persist");
     MoodStore *reload=[[MoodStore alloc] initWithRoot:eight.root];NSDictionary *loaded=[reload load];
-    CHECK(!reload.readOnly&&[loaded[@"events"] count]==9&&[loaded[@"summaries"][@"2026-11-04"][@"counts"] count]==9,"all nine moods and counts reload without protection mode");}
+    CHECK(!reload.readOnly&&[loaded[@"events"] count]==10&&[loaded[@"summaries"][@"2026-11-04"][@"counts"] count]==10,"all ten moods and counts reload without protection mode");}
 done:
     [NSFileManager.defaultManager removeItemAtURL:root error:NULL];
-    if(ok)puts("PASS: atomic save, backup, persistence reload, malformed state, concurrent edit, corruption preservation, GIF decode/timing, fake image rejection, nine mood events/recap reload");
+    if(ok)puts("PASS: atomic save, backup, persistence reload, malformed state, concurrent edit, corruption preservation, GIF decode/timing, fake image rejection, ten mood events/recap reload");
     return ok;
 }

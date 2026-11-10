@@ -1,5 +1,6 @@
 #import "../CodexAlerts.h"
 #include <assert.h>
+#include <sqlite3.h>
 
 int main(int argc,const char *argv[]){@autoreleasepool{
     if(argc==3&&strcmp(argv[1],"--read-inbox")==0){
@@ -39,6 +40,23 @@ int main(int argc,const char *argv[]){@autoreleasepool{
     NSURL *directory=[root URLByAppendingPathComponent:@"preserve.json" isDirectory:YES];[NSFileManager.defaultManager createDirectoryAtURL:directory withIntermediateDirectories:YES attributes:nil error:NULL];
     [inbox poll];assert([NSFileManager.defaultManager fileExistsAtPath:directory.path]);
     [inbox dismiss:inbox.items.firstObject[@"id"]];assert(inbox.items.count==0);
+    NSURL *database=[root URLByAppendingPathComponent:@"receipts.sqlite"];
+    sqlite3 *db=NULL;assert(sqlite3_open(database.fileSystemRepresentation,&db)==SQLITE_OK);
+    assert(sqlite3_exec(db,"CREATE TABLE thread_read_receipts(thread_id TEXT PRIMARY KEY,first_unread_turn TEXT,last_published_turn TEXT); INSERT INTO thread_read_receipts VALUES('synthetic-thread','turn-two','turn-two');",NULL,NULL,NULL)==SQLITE_OK);
+    assert([CodexAlerts acknowledgedEvents:@[completion] database:database].count==0);
+    assert(sqlite3_exec(db,"UPDATE thread_read_receipts SET first_unread_turn=NULL;",NULL,NULL,NULL)==SQLITE_OK);
+    NSData *beforeReceiptRead=[NSData dataWithContentsOfURL:database];
+    assert(([[CodexAlerts acknowledgedEvents:@[completion,waiting] database:database] isEqual:@[completion[@"id"]]]));
+    assert([beforeReceiptRead isEqual:[NSData dataWithContentsOfURL:database]]);
+    NSMutableDictionary *newer=[completion mutableCopy];newer[@"turn"]=@"turn-three";
+    assert([CodexAlerts acknowledgedEvents:@[newer] database:database].count==0);
+    [newer removeObjectForKey:@"turn"];assert([CodexAlerts acknowledgedEvents:@[newer] database:database].count==0);
+    assert(sqlite3_exec(db,"DROP TABLE thread_read_receipts;",NULL,NULL,NULL)==SQLITE_OK);
+    assert([CodexAlerts acknowledgedEvents:@[completion] database:database].count==0);sqlite3_close(db);
+    NSURL *missing=[root URLByAppendingPathComponent:@"not-created.sqlite"];
+    assert([CodexAlerts acknowledgedEvents:@[completion] database:missing].count==0);
+    assert(![NSFileManager.defaultManager fileExistsAtPath:missing.path]);
+    puts("PASS: exact-turn read receipt clears completion only; unread, newer, pending and unknown schema survive; database stays unchanged");
     [NSFileManager.defaultManager removeItemAtURL:root error:NULL];
     puts("PASS: Codex alert input bounds, neutral lifecycle types, duplicate/out-of-order events, resolution, safe chat URLs, atomic inbox consumption and dismissal");
 }return 0;}
