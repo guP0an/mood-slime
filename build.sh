@@ -7,7 +7,7 @@ xcrun clang -fobjc-arc -fno-modules -O2 -mmacosx-version-min=13.0 \
   -Wall -Wextra -Werror -Wno-unused-parameter \
   -framework AppKit -framework WebKit -framework ImageIO -framework CoreGraphics -framework UniformTypeIdentifiers \
   App.m Store.m CodexAlerts.m -lsqlite3 -o "$app/Contents/MacOS/MoodSlime"
-cp web/index.html web/style.css web/model.js web/physics.js web/pet.js web/app.js "$app/Contents/Resources/web/"
+cp web/index.html web/style.css web/model.js web/physics.js web/pet.js web/expressions.js web/app.js "$app/Contents/Resources/web/"
 mkdir -p "$app/Contents/Resources/web/vendor"
 cp web/vendor/three.min.js web/vendor/THREE-LICENSE.txt web/vendor/PROVENANCE.json "$app/Contents/Resources/web/vendor/"
 cp tests/integration.js "$app/Contents/Resources/integration.js"
@@ -20,8 +20,8 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIdentifier</key><string>local.silovere.moodslime</string>
 <key>CFBundleExecutable</key><string>MoodSlime</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.12.14</string>
-<key>CFBundleVersion</key><string>36</string>
+<key>CFBundleShortVersionString</key><string>0.13.0</string>
+<key>CFBundleVersion</key><string>37</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSPrincipalClass</key><string>NSApplication</string>

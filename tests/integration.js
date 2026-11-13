@@ -231,7 +231,7 @@ const eyeKinds=new Set(),eventsBeforeFaces=app.snapshot().events.length;
 for(const mood of MoodModel.moods){
   app.pet.delightUntil=0;app.pet.heartUntil=0;app.pet.setMood(mood.id);
   app.pet.look.set(0,0);app.pet.lookTarget.set(0,0);app.pet.attentionUntil=0;
-  app.pet.clock=mood.id==='happy'?1.8:mood.id==='tired'?2.7:4;
+  app.pet.clock=mood.id==='happy'?1.8:mood.id==='tired'?2.7:1;
   app.pet.draw();
   check(app.pet.rope.visible===(mood.id==='overwhelmed'),'suspension rope is limited to the overwhelmed native ball: '+mood.id);
   if(mood.id==='overwhelmed'){
@@ -262,29 +262,39 @@ for(const mood of MoodModel.moods){
   gl.readPixels(Math.round((sample.x*.5+.5)*initialCanvas.width),Math.round((sample.y*.5+.5)*initialCanvas.height),1,1,gl.RGBA,gl.UNSIGNED_BYTE,bodyPixel);
   const brightest=Math.max(...bodyPixel.slice(0,3)),saturation=(brightest-Math.min(...bodyPixel.slice(0,3)))/Math.max(1,brightest);
   check(bodyPixel[3]>=220&&brightest>150&&saturation>.025&&saturation<.55,'rendered '+mood.id+' jelly stays visible and softly colored without oversaturation: '+saturation.toFixed(3));
-  eyeKinds.add(mood.id==='happy'?'closed reference laugh':mood.id==='angry'?'original anger':JSON.stringify(app.pet.expressionEyes[0].userData.profile));
+  const newFace=app.pet.studyFaces[mood.id];
+  check(Object.values(app.pet.studyFaces).filter(f=>f.group.visible!==false).length===(newFace?1:0),'exactly the selected face is visible without overlays: '+mood.id);
+  if(newFace)check(newFace.group.visible&&app.pet.features.every(f=>f.visible===false),'new face replaces all legacy facial parts: '+mood.id);
+  eyeKinds.add(newFace?JSON.stringify(newFace.profile):mood.id==='happy'?'closed reference laugh':mood.id==='angry'?'original anger':JSON.stringify(app.pet.expressionEyes[0].userData.profile));
   const bodyWidth=new THREE.Box3().setFromObject(app.pet.mesh).getSize(new THREE.Vector3()).x;
   if(mood.id==='calm'){
-    const glassesBox=new THREE.Box3();app.pet.glasses.forEach(g=>glassesBox.expandByObject(g));
+    const glassesBox=new THREE.Box3();newFace.parts.filter(p=>p.mesh.material===app.pet.studyGlass).forEach(p=>glassesBox.expandByObject(p.mesh));
     const ratio=glassesBox.getSize(new THREE.Vector3()).x/bodyWidth;
     check(ratio>=.6&&ratio<=.8,'actual 3D glasses cover 60 to 80 percent of the ball width: '+ratio.toFixed(3));
   }
   if(mood.id==='happy')check(new THREE.Box3().setFromObject(app.pet.grin).getSize(new THREE.Vector3()).x/bodyWidth>=.33,'actual toothy smile occupies at least one third of the ball width');
   if(mood.id==='happy')check(app.pet.reduced.matches||app.pet.grin.visible&&app.pet.joyBlush.visible&&app.pet.happyEyes.every(e=>e.visible)&&app.pet.expressionEyes.every(e=>!e.visible)&&app.pet.grin.userData.fill.geometry.type==='ExtrudeGeometry'&&app.pet.facialState.cheekRaise>.05,'joy uses the selected closed smile eyes, two cheek marks and scalloped toothy grin');
-  if(mood.id==='sad')check(app.pet.brows.every(b=>b.visible)&&!app.pet.grin.visible,'sad expression has raised inner brows without the happy laugh');
+  if(mood.id==='sad')check(newFace.eyes.every(e=>e.tear.mesh.visible)&&!app.pet.grin.visible,'sad expression has visible tear pools and no happy laugh');
   const tintInfo=await native('testCodexAlert',{kind:'completed'});
   check(tintInfo.petTint.toLowerCase()==='#'+app.pet.color.getHexString(),'notification bubble follows the rendered pet color for '+mood.id);
   if(mood.id==='tired'){
-    check(app.pet.expressionEyes.every(e=>e.userData.parts.bag.visible)&&app.pet.exhaustedMouth.visible&&!app.pet.grin.visible,'fatigue uses heavy low eyelids, under-eye shading and a slack small mouth, without a permanent yawn');
+    check(newFace.eyes.every(e=>e.open<.55)&&!newFace.yawn&&!app.pet.grin.visible,'fatigue uses heavy low eyelids and a slack closed mouth without a permanent yawn');
     check(app.pet.group.scale.y<.93&&app.pet.group.scale.x>1&&app.pet.group.position.y<0,'exhaustion has a grounded slouched silhouette instead of a sleepy upright pose');
   }
-  if(mood.id==='sleepy')check(app.pet.sleepyMouth.visible&&app.pet.sleepMarks.length===2&&app.pet.sleepMarks.every(z=>z.visible)&&!app.pet.exhaustedMouth.visible&&app.pet.expressionEyes.every(e=>e.visible&&!e.userData.parts.bag.visible&&e.userData.parts.glints.every(g=>!g.visible)&&e.userData.profile.height/e.userData.profile.width<.4)&&app.pet.color.getHexString()==='7892ac','approved sleepy B has narrow half-open eyes, a pink yawn, two Z marks and the selected dusty blue');
-  if(mood.id==='calm')check(app.pet.expressionEyes.every(e=>e.visible)&&app.pet.glasses.every(g=>g.visible)&&app.pet.catMouth.visible,'calm has clear eyes behind slim black 3D glasses');
-  if(mood.id==='anxious')check(app.pet.expressionEyes.every(e=>e.visible)&&app.pet.worriedMouth.visible,'anxiety has independently movable pupils and a wavy mouth');
-  if(mood.id==='sad')check(app.pet.expressionEyes.every(e=>e.userData.parts.pool.visible)&&app.pet.tearDrops.every(e=>e.visible),'sadness has large watery eyes and two teardrops');
-  if(mood.id==='resigned')check(app.pet.expressionEyes.every(e=>e.visible)&&app.pet.sighMouth.visible&&app.pet.brows.every(b=>b.visible)&&!app.pet.smirk.visible,'resigned uses drooping eyes, inner-raised brows and a sigh mouth');
-  if(mood.id==='speechless')check(app.pet.expressionEyes.every(e=>e.visible&&!e.userData.parts.pupil.visible)&&app.pet.smirk.visible&&app.pet.question.visible&&app.pet.cheeks.every(c=>!c.visible),'speechless has blank white eyes, a crooked smile, a 3D question mark and no blush');
-  if(!['angry','happy'].includes(mood.id))check(app.pet.expressionEyes.every(e=>e.visible&&e.userData.parts.shell.userData.fill.geometry.type==='ExtrudeGeometry'),'mood '+mood.id+' uses real outlined 3D eye geometry');
+  if(mood.id==='sleepy')check(newFace.yawn.mesh.visible&&newFace.tongue.mesh.visible&&newFace.eyes.every(e=>e.shadow.mesh.visible&&e.shadow.mesh.material.transparent&&e.open<.3)&&app.pet.color.getHexString()==='7892ac','sleepy has soft black circles, relaxed lids, a small pink yawn and the existing dusty blue');
+  if(mood.id==='calm')check(newFace.eyes.every(e=>e.white.mesh.visible&&e.iris.mesh.visible)&&newFace.parts.filter(p=>p.mesh.material===app.pet.studyGlass).length===5,'calm has clear gentle eyes and five large black glasses parts');
+  if(mood.id==='anxious')check(newFace.eyes[0].w!==newFace.eyes[1].w&&newFace.eyes.every(e=>e.iris.mesh.material.onBeforeCompile),'anxiety has asymmetric eyes and pupils clipped to the eye aperture');
+  if(mood.id==='resigned')check(newFace.eyes.every(e=>e.dy>0)&&newFace.eyes[0].v!==newFace.eyes[1].v,'resigned combines upward gaze and asymmetric eye placement');
+  if(mood.id==='speechless')check(newFace.eyes.every(e=>e.dx>.1&&e.open<.5)&&app.pet.cheeks.every(c=>!c.visible)&&newFace.group.children.length>newFace.parts.length,'speechless has half-lidded side-eye, a question mark and no blush');
+  if(newFace){
+    const clock=app.pet.clock,reduced=app.pet.reduced;
+    app.pet.reduced={matches:false};app.pet.clock=mood.id==='sleepy'?4.9:3.94;app.pet.draw();
+    check(newFace.eyes.every(e=>e.upper===e.lower&&!e.white.mesh.visible&&!e.iris.mesh.visible&&!e.glint.mesh.visible&&e.lid.mesh.visible),'fully closed '+mood.id+' eyes show a single soft lid without sclera or highlights');
+    app.pet.clock=1;app.pet.draw();check(newFace.eyes.every(e=>e.white.mesh.visible&&e.iris.mesh.visible),'eyes reopen after blinking: '+mood.id);
+    app.pet.reduced={matches:true};app.pet.clock=2;app.pet.draw();const stillEyes=JSON.stringify(newFace.eyes.map(e=>[e.dx,e.dy,e.open]));app.pet.clock=9;app.pet.draw();
+    check(JSON.stringify(newFace.eyes.map(e=>[e.dx,e.dy,e.open]))===stillEyes,'reduced motion freezes the new face: '+mood.id);
+    app.pet.reduced=reduced;app.pet.clock=clock;app.pet.draw();
+  }
   if(mood.id==='overwhelmed')check(app.pet.overwhelmedMouth.visible&&app.pet.expressionEyes.every(e=>e.userData.profile.pupilHeight<e.userData.profile.height*.4&&e.userData.parts.glints.every(g=>!g.visible)),'overwhelmed has wide vacant eyes, small matte pupils and the selected flat mouth');
   if(mood.id==='angry')check(app.pet.grittedMouth.visible&&app.pet.teeth.length===10&&app.pet.teeth.every(t=>t.visible)&&app.pet.angryEyes.every(e=>e.visible)&&app.pet.expressionEyes.every(e=>!e.visible),'exaggerated annoyance combines narrowed angled eyes, gritted mouth and ten block teeth');
   if(mood.id==='angry'){
@@ -315,17 +325,18 @@ check(app.snapshot().events.length===eventsBeforeFaces,'visual expression sample
 app.pet.setMood('anxious');app.pet.attentionUntil=0;app.pet.lookTarget.set(0,0);app.pet.clock=4;
 await showWindow();
 const gazeSamples=[];
-for(let i=0;i<6;i++){await wait(260);gazeSamples.push([app.pet.eyeGaze.x,app.pet.eyeGaze.y]);const frame=await native('testSnapshot',{name:'gaze-'+i+'.png'});check(frame.ok&&!frame.skipped,'actual animated gaze frame '+i);}
-check(app.pet.reduced.matches||Math.max(...gazeSamples.map(p=>p[0]))-Math.min(...gazeSamples.map(p=>p[0]))>.25,'anxious pupils scan horizontally over real rendered frames');
-check(app.pet.reduced.matches||Math.max(...gazeSamples.map(p=>p[1]))-Math.min(...gazeSamples.map(p=>p[1]))>.15,'anxious pupils scan vertically over real rendered frames');
+// Four held gaze destinations take five seconds; sample a whole cycle.
+for(let i=0;i<20;i++){await wait(260);gazeSamples.push([app.pet.studyFaces.anxious.eyes[0].dx,app.pet.studyFaces.anxious.eyes[0].dy]);if(i<6){const frame=await native('testSnapshot',{name:'gaze-'+i+'.png'});check(frame.ok&&!frame.skipped,'actual animated gaze frame '+i);}}
+check(app.pet.reduced.matches||Math.max(...gazeSamples.map(p=>p[0]))-Math.min(...gazeSamples.map(p=>p[0]))>.10,'anxious pupils scan horizontally over a full rendered cycle: '+JSON.stringify(gazeSamples));
+check(app.pet.reduced.matches||Math.max(...gazeSamples.map(p=>p[1]))-Math.min(...gazeSamples.map(p=>p[1]))>.06,'anxious pupils scan vertically over a full rendered cycle: '+JSON.stringify(gazeSamples));
 app.pet.lookAtDesktop(1,0);
 const rightGazeDeadline=performance.now()+1200;
-while(!app.pet.reduced.matches&&!app.pet.expressionEyes.every(e=>e.userData.parts.pupil.position.x>0)&&performance.now()<rightGazeDeadline)await wait(40);
-check(app.pet.reduced.matches||app.pet.expressionEyes.every(e=>e.userData.parts.pupil.position.x>0),'anxious eyes attend to a pointer on the right: '+JSON.stringify({gaze:app.pet.eyeGaze.toArray(),target:app.pet.lookTarget.toArray(),clock:app.pet.clock,attentionUntil:app.pet.attentionUntil,held:!!app.pet.body.hold,hidden:document.hidden,pupils:app.pet.expressionEyes.map(e=>e.userData.parts.pupil.position.x)}));
+while(!app.pet.reduced.matches&&!app.pet.studyFaces.anxious.eyes.every(e=>e.dx>0)&&performance.now()<rightGazeDeadline)await wait(40);
+check(app.pet.reduced.matches||app.pet.studyFaces.anxious.eyes.every(e=>e.dx>0),'anxious eyes attend to a pointer on the right: '+JSON.stringify({gaze:app.pet.eyeGaze.toArray(),target:app.pet.lookTarget.toArray(),clock:app.pet.clock,attentionUntil:app.pet.attentionUntil,held:!!app.pet.body.hold,hidden:document.hidden,pupils:app.pet.studyFaces.anxious.eyes.map(e=>e.dx)}));
 app.pet.lookAtDesktop(-1,0);
 const leftGazeDeadline=performance.now()+1200;
-while(!app.pet.reduced.matches&&!app.pet.expressionEyes.every(e=>e.userData.parts.pupil.position.x<0)&&performance.now()<leftGazeDeadline)await wait(40);
-check(app.pet.reduced.matches||app.pet.expressionEyes.every(e=>e.userData.parts.pupil.position.x<0),'anxious eyes follow a pointer back to the left');
+while(!app.pet.reduced.matches&&!app.pet.studyFaces.anxious.eyes.every(e=>e.dx<0)&&performance.now()<leftGazeDeadline)await wait(40);
+check(app.pet.reduced.matches||app.pet.studyFaces.anxious.eyes.every(e=>e.dx<0),'anxious eyes follow a pointer back to the left');
 app.pet.lookTarget.set(0,0);app.pet.attentionUntil=0;
 
 for(const [mood,label] of [['resigned','无奈'],['speechless','无语'],['overwhelmed','要死了'],['sleepy','好困']]){
