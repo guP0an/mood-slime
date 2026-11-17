@@ -50,3 +50,10 @@ for(const mood of ['calm','happy','angry','tired','verytired','overwhelmed','hea
 const heights=['happy','tired','verytired','overwhelmed'].map(m=>{s.setRestPose(m);return s.deform(0,1,0).y-s.deform(0,-1,0).y;});
 assert(heights.every((h,i)=>i===0||h<heights[i-1]),'fatigue and overwhelmed have increasingly deflated silhouettes');
 console.log('PASS: emotional rest poses retain positive volume and recover after gestures');
+s.values.fill(0);s.velocity.fill(0);s.prepare();s.setRestPose('overwhelmed');
+for(const pull of [[250,200],[390,110],[130,280]]){
+  s.grab(250,200);if(pull[0]!==250)s.move(...pull);step(130);
+  for(let x=-.8;x<=.8;x+=.2)for(let y=-.6;y<=.6;y+=.2)positiveJacobian(s,x,y,.2);
+  s.release();step(1400);assert(s.settled,'asymmetric slouch recovers after each gesture');
+}
+console.log('PASS: asymmetric overwhelmed volume stays positive during compression and directional pulls');

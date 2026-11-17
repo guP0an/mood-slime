@@ -276,7 +276,7 @@ for(const mood of MoodModel.moods){
   }
   if(mood.id==='overwhelmed'){
     check(newFace.tongue.mesh.visible&&newFace.bow.length===3&&newFace.eyes.every(e=>!e.glint.mesh.visible),'deflated overwhelmed has vacant eyes, a drooping tongue and top bow');
-    check(app.pet.body.restHeight===.43&&app.pet.body.restWidth===1.32,'overwhelmed has the lowest widest emotional rest pose');
+    check(app.pet.body.restHeight===.57&&app.pet.body.restWidth===1.20,'overwhelmed stays softly deflated with volume instead of a flat disc');
     const head=app.pet.body.deform(0,1,0),end=app.pet.group.localToWorld(new THREE.Vector3(head.x,head.y,head.z));
     const ropeEnd=app.pet.rope.localToWorld(new THREE.Vector3(0,.5,0));
     check(ropeEnd.distanceTo(end)<.001,'charm cord remains attached to the actual deformed top');

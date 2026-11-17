@@ -38,11 +38,11 @@
       this.setupLighting();this.setupBody();this.setupFace();this.setupBandages();this.setupShadow();
       this.ropeTop=new T.Vector3(0,2.2,0);
       const ropeTexture=makeTexture(64,128,(c,w,h)=>{
-        c.fillStyle='#B59A65';c.fillRect(0,0,w,h);c.strokeStyle='#76603C';c.lineWidth=9;
+        c.fillStyle='#CBB78F';c.fillRect(0,0,w,h);c.strokeStyle='#A58D68';c.lineWidth=5;
         for(let y=-64;y<h;y+=32){c.beginPath();c.moveTo(0,y);c.lineTo(w,y+32);c.stroke();}
       });
       ropeTexture.wrapS=T.RepeatWrapping;ropeTexture.wrapT=T.RepeatWrapping;
-      this.rope=new T.Mesh(new T.CylinderGeometry(.045,.045,1,12),new T.MeshBasicMaterial({map:ropeTexture,toneMapped:false,transparent:true}));
+      this.rope=new T.Mesh(new T.CylinderGeometry(.020,.020,1,12),new T.MeshBasicMaterial({map:ropeTexture,toneMapped:false,transparent:true}));
       this.rope.visible=false;this.scene.add(this.rope);
       this.bindInput();
       new ResizeObserver(()=>this.resize()).observe(canvas);

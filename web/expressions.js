@@ -4,7 +4,7 @@
   const profiles={
     coding:{w:.175,h:.18,iris:[.105,.13],open:.88,gaze:[.01,-.035]},
     headache:{w:.235,h:.23,iris:[.11,.14],open:.58,gaze:[-.015,-.035]},
-    overwhelmed:{w:.34,h:.45,iris:[.033,.041],open:1,gaze:[-.025,.19]},
+    overwhelmed:{w:.225,h:.275,iris:[.034,.043],open:.91,gaze:[-.015,.065]},
     verytired:{w:.29,h:.23,iris:[.145,.16],open:.34,gaze:[.075,-.065]},
     sick:{w:.25,h:.19,iris:[.118,.13],open:.53,gaze:[.02,-.035]},
     calm:{w:.18,h:.19,iris:[.116,.14],open:.91,gaze:[.035,.005]},
@@ -95,7 +95,7 @@
       if(face.mood==='sick')eye.v+=side>0?-.026:.015;
       if(face.mood==='verytired')eye.v+=side<0?-.065:.035;
       if(face.mood==='headache')eye.v+=side>0?-.025:.01;
-      if(face.mood==='overwhelmed'){eye.u=side*.36;eye.v=side<0?.20:.35;}
+      if(face.mood==='overwhelmed'){eye.u=side*.31;eye.v=side<0?.17:.24;}
       if(face.mood==='resigned')eye.v+=side*.018;
       if(face.mood==='anxious')eye.v+=side<0?.02:-.02;
       eye.uniform={value:new T.Vector3(eye.w,eye.h,2*eye.open-1)};
@@ -147,7 +147,7 @@
         eye.rim.mesh.material=new T.MeshBasicMaterial({color:0xBE8278,toneMapped:false,transparent:true,opacity:.68});
       }
       face.eyes.push(eye);
-      const lift=face.mood==='calm'?.46:face.mood==='sleepy'?.37:face.mood==='verytired'?.49:face.mood==='overwhelmed'?.78:.46;
+      const lift=face.mood==='calm'?.46:face.mood==='sleepy'?.37:face.mood==='verytired'?.49:face.mood==='overwhelmed'?.57:.46;
       this.curve(face,t=>{
         const x=(t-.5)*.22,arch=Math.sin(t*Math.PI)*.02;
         let y=arch;
@@ -260,9 +260,9 @@
     }
     buildDeflatedFace(face){
       const curve=new T.Curve();curve.getPoint=t=>new T.Vector3((t-.5)*.40,Math.sin(t*Math.PI*2)*.012,0);
-      face.flatMouth=this.curve(face,t=>{const p=curve.getPoint(t);return[p.x,p.y,0];},.015,-.32,.006,.055);
-      const tongue=new T.Shape();tongue.moveTo(-.035,.01);tongue.quadraticCurveTo(.07,.025,.09,-.18);tongue.quadraticCurveTo(.11,-.38,.02,-.38);tongue.quadraticCurveTo(-.025,-.38,-.035,.01);
-      face.tongue=this.add(face,new T.ExtrudeGeometry(tongue,{depth:.02,bevelEnabled:true,bevelThickness:.005,bevelSize:.005,bevelSegments:2}),new T.MeshBasicMaterial({color:0xD79C9F,toneMapped:false,transparent:true}),.18,-.325,.076);
+      face.flatMouth=this.curve(face,t=>{const p=curve.getPoint(t);return[p.x,p.y,0];},.015,-.24,.005,.055);
+      const tongue=new T.Shape();tongue.moveTo(0,0);tongue.quadraticCurveTo(.085,.02,.105,-.14);tongue.quadraticCurveTo(.135,-.30,.045,-.30);tongue.quadraticCurveTo(0,-.29,0,0);
+      face.tongue=this.add(face,new T.ExtrudeGeometry(tongue,{depth:.02,bevelEnabled:true,bevelThickness:.005,bevelSize:.005,bevelSegments:2}),new T.MeshBasicMaterial({color:0xD79C9F,toneMapped:false,transparent:true}),.20,-.24,.076);
       const cordMat=new T.MeshStandardMaterial({color:0xC4AA83,roughness:.9,transparent:true});
       face.bow=[];
       for(const side of [-1,1]){
