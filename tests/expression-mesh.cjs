@@ -5,15 +5,16 @@ vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/vendor/three.min.js'
 const T=context.THREE;context.window.THREE=T;
 const {Slime}=require('../web/physics.js');
 class BaseFixture {
-  constructor(){this.group=new T.Group();this.body=new Slime();this.features=[new T.Group()];this.mood='calm';this.clock=1;this.attentionUntil=0;this.lookTarget=new T.Vector2();this.reduced={matches:false};this.facialState={hurt:false};}
+  constructor(){this.group=new T.Group();this.body=new Slime();this.features=[new T.Group()];this.mood='calm';this.clock=1;this.attentionUntil=0;this.lookTarget=new T.Vector2();this.reduced={matches:false};this.facialState={hurt:false};this.mapped=[];}
+  deformable(geometry,material){const mesh=new T.Mesh(geometry,material);this.mapped.push({mesh,rest:Float32Array.from(geometry.attributes.position.array)});this.group.add(mesh);return mesh;}
   attachFeatures(){this.features.forEach(f=>f.visible=true);}
   draw(){this.attachFeatures();}
 }
 context.MoodPet=BaseFixture;
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/expressions.js'),'utf8'),context);
 const {profiles,acting}=context.window.MoodExpressions,pet=new context.window.MoodPet();
-assert.equal(Object.keys(pet.studyFaces).length,7);
-for(const mood of ['happy','overwhelmed','angry']){
+assert.equal(Object.keys(pet.studyFaces).length,12);
+for(const mood of ['happy','angry']){
   pet.mood=mood;pet.attachFeatures();assert.equal(pet.studyState.active,false);
   assert(pet.features.every(f=>f.visible));assert(Object.values(pet.studyFaces).every(f=>f.group.visible===false),'Three.js only skips visible === false; undefined renders every face');
 }
@@ -35,15 +36,18 @@ for(const mood of Object.keys(profiles)){
   }
   assert.deepEqual(face.parts.map(p=>p.mesh.geometry.uuid),ids,'animations reuse geometry instead of rebuilding it');
   const savedReduced=pet.reduced;pet.reduced={matches:false};
-  const closeTime=mood==='sleepy'?4.9:3.94;
+  const closeTime=['sleepy','sick','headache','verytired'].includes(mood)?4.9:3.94;
+  if(mood!=='overwhelmed'){
   pet.clock=closeTime;pet.attachFeatures();
   for(const eye of face.eyes){
     assert.equal(eye.upper,eye.lower,'fully closed lids meet');
     for(const part of [eye.white,eye.outline,eye.iris,eye.glint])assert.equal(part.mesh.visible,false,'closed eye exposes neither sclera nor iris');
     assert.equal(eye.lid.mesh.visible,true,'one gentle eyelid remains');
+    if(eye.rim)assert.equal(eye.rim.mesh.visible,false,'illness rim disappears on complete closure');
   }
   pet.clock=1;pet.attachFeatures();
   for(const eye of face.eyes)assert(eye.white.mesh.visible&&eye.iris.mesh.visible,'eye reopens after a blink');
+  }
   if(mood==='sleepy')assert(face.eyes.every(e=>e.shadow&&e.shadow.mesh.material.transparent),'sleepy has soft under-eye shading');
   pet.reduced=savedReduced;
   pet.facialState.hurt=true;pet.attachFeatures();assert.equal(face.group.visible,false,'injury feedback overrides the new face');pet.facialState.hurt=false;
@@ -56,16 +60,21 @@ for(const mood of Object.keys(profiles)){
   }
 }
 // Exercise transitions after every new face, including the protected original moods.
-for(const from of Object.keys(profiles))for(const to of ['happy','overwhelmed','angry']){
+for(const from of Object.keys(profiles))for(const to of ['happy','angry']){
   pet.mood=from;pet.attachFeatures();pet.mood=to;pet.attachFeatures();
   for(const face of Object.values(pet.studyFaces))assert.equal(face.group.visible,false,from+' -> '+to+' must hide all new face groups');
 }
 assert(acting('calm',3.94,false,0,0,false).open<.1,'blink closes the lid, not the whole eye scale');
 assert.equal(acting('anxious',.1,false,0,0,false).x,acting('anxious',.5,false,0,0,false).x,'anxious gaze holds between movements');
 for(const mood of Object.keys(profiles)){
+  if(mood==='overwhelmed'){assert.deepEqual(acting(mood,2,true,1,0,false),acting(mood,5,true,-1,0,false),'vacant eyes stay unfocused');continue;}
   assert(acting(mood,2,true,1,0,false).x>0);
   assert(acting(mood,2,true,-1,0,false).x<0);
 }
 const html=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
 assert(html.indexOf('pet.js')<html.indexOf('expressions.js')&&html.indexOf('expressions.js')<html.indexOf('app.js'),'new face class loads before the app creates its pet');
-console.log('PASS: 7 new 3D faces, 3 protected moods, squeeze/stretch geometry, closed/reopened lids, skin/injury override, black circles, reduced motion, pointer direction and load order');
+console.log('PASS: 12 3D faces, 2 protected faces, squeeze/stretch geometry, closed/reopened lids, skin/injury override, black circles, reduced motion, pointer direction and load order');
+
+assert(pet.studyFaces.headache.wraps.length===2);assert(pet.studyFaces.sick.thermometer);assert(pet.studyFaces.overwhelmed.bow.length===3);
+assert(pet.studyFaces.coding.keyboard.position.z>1.5,'keyboard leaves a visible gap in front of the body');
+assert(pet.studyFaces.coding.hands.every(h=>h.position.z>1.5),'typing hands follow the moved keyboard');

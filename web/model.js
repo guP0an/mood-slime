@@ -6,11 +6,15 @@
     {id:'sad', name:'难过', color:'#94AFCA', ink:'#486782'},
     {id:'anxious', name:'焦虑', color:'#B8A6CB', ink:'#735F89'},
     {id:'angry', name:'烦躁', color:'#DA9787', ink:'#935448'},
-    {id:'tired', name:'疲惫', color:'#B7B1A4', ink:'#6D685C'},
+    {id:'tired', name:'轻微疲惫', color:'#B7B1A4', ink:'#6D685C'},
     {id:'resigned', name:'无奈', color:'#C5B18C', ink:'#7B6846'},
     {id:'speechless', name:'无语', color:'#9CBABF', ink:'#4B7078'},
     {id:'overwhelmed', name:'要死了', color:'#AAA6B5', ink:'#615D6C'},
-    {id:'sleepy', name:'好困', color:'#91A2B8', ink:'#5D6471'}
+    {id:'sleepy', name:'好困', color:'#91A2B8', ink:'#5D6471'},
+    {id:'verytired', name:'非常疲惫', color:'#A79AB6', ink:'#675A78'},
+    {id:'headache', name:'头痛', color:'#C48F9A', ink:'#895564'},
+    {id:'sick', name:'生病', color:'#DDB898', ink:'#8E6148'},
+    {id:'coding', name:'沉浸开发', color:'#79A5AE', ink:'#426A75'}
   ];
   const moodById = Object.fromEntries(moods.map(m=>[m.id,m]));
   function dayKey(date = new Date()) {

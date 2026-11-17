@@ -15,7 +15,7 @@ app.pet.draw();gl.readPixels(Math.floor(initialCanvas.width/2),Math.floor(initia
 check(pixel[3]>0,'3D pet is painted before any interaction');
 check(app.pet.mesh.geometry.attributes.position.count>2000&&app.pet.material.isMeshPhysicalMaterial,'real 3D mesh and physically lit material');
 check(document.getElementById('record').getBoundingClientRect().bottom<=innerHeight,'record action is visible without scrolling');
-check(document.querySelectorAll('.mood-option').length===10,'ten selectable moods include sleepy');
+check(document.querySelectorAll('.mood-option').length===14,'fourteen selectable moods include health and fatigue levels');
 check(Object.keys(app.snapshot().summaries).length>0,'missed midnights archived at launch');
 document.querySelector('.local-label').textContent='合成数据 · 集成自检';
 const before=app.snapshot().events.length;
@@ -139,7 +139,7 @@ check(app.pet.body.settled,'body recovers after stretching before desktop rest s
 const menu=await native('testMenuInfo');
 const flatten=items=>items.flatMap(i=>[i,...flatten(i.children||[])]);
 const menuItems=flatten(menu.items);
-check(menuItems.filter(i=>i.command?.startsWith('mood:')).length===10,'native context menu exposes all ten moods');
+check(menuItems.filter(i=>i.command?.startsWith('mood:')).length===14,'native context menu exposes all fourteen moods');
 check(['follow','stroke','squish','move','skin','resetSkin','export','storage','calendar','hide','quit'].every(command=>menuItems.some(i=>i.command===command)),'native context menu exposes follow, interaction, settings and calendar actions');
 check(!menu.following,'cursor following is opt-in by default');
 check((await native('testMenuCommand',{command:'follow'})).ok,'native follow menu toggles on');
@@ -229,35 +229,14 @@ check(!app.pending,'no outstanding save');
 await app.desktop(true);await showWindow();
 const eyeKinds=new Set(),eventsBeforeFaces=app.snapshot().events.length;
 for(const mood of MoodModel.moods){
-  app.pet.delightUntil=0;app.pet.heartUntil=0;app.pet.setMood(mood.id);
+  app.pet.injury=0;app.pet.delightUntil=0;app.pet.heartUntil=0;app.pet.setMood(mood.id);
   app.pet.look.set(0,0);app.pet.lookTarget.set(0,0);app.pet.attentionUntil=0;
   app.pet.clock=mood.id==='happy'?1.8:mood.id==='tired'?2.7:1;
   app.pet.draw();
   check(app.pet.rope.visible===(mood.id==='overwhelmed'),'suspension rope is limited to the overwhelmed native ball: '+mood.id);
-  if(mood.id==='overwhelmed'){
-    const mouthCorner=app.pet.overwhelmedMouth.localToWorld(app.pet.overwhelmedMouth.children[0].geometry.parameters.path.getPoint(1));
-    const tongueRoot=app.pet.overwhelmedTongue.localToWorld(new THREE.Vector3(0,0,.006));
-    check(tongueRoot.distanceTo(mouthCorner)<.001,'tongue root remains attached to the actual mouth endpoint');
-    const tonguePoint=app.pet.overwhelmedTongue.localToWorld(new THREE.Vector3(0,-.04,.012)).project(app.pet.camera),tonguePixel=new Uint8Array(4);
-    gl.readPixels(Math.round((tonguePoint.x*.5+.5)*initialCanvas.width),Math.round((tonguePoint.y*.5+.5)*initialCanvas.height),1,1,gl.RGBA,gl.UNSIGNED_BYTE,tonguePixel);
-    check(app.pet.overwhelmedTongue.parent===app.pet.overwhelmedMouth&&tonguePixel[3]===255&&tonguePixel[0]>tonguePixel[1]+30&&tonguePixel[2]>tonguePixel[1],'overwhelmed tongue hangs from one mouth corner and renders pink');
-    const head=app.pet.body.deform(0,1,0),end=app.pet.group.localToWorld(new THREE.Vector3(head.x,head.y,head.z));
-    const ropeEnd=app.pet.rope.localToWorld(new THREE.Vector3(0,.5,0));
-    const ropeWidth=new THREE.Box3().setFromObject(app.pet.rope).getSize(new THREE.Vector3()).x,ballWidth=new THREE.Box3().setFromObject(app.pet.mesh).getSize(new THREE.Vector3()).x;
-    check(ropeWidth/ballWidth>.035&&app.pet.rope.material.map!==null,'hanging rope has visible thickness and a twisted-fiber texture');
-    check(app.pet.expressionEyes[1].position.y-app.pet.expressionEyes[0].position.y>.1,'vacant eyes retain the reference height difference');
-    for(const eye of app.pet.expressionEyes){
-      const fill=eye.userData.parts.shell.userData.fill,positions=fill.geometry.attributes.position,bounds=new THREE.Box2(),point=new THREE.Vector3();
-      for(let i=0;i<positions.count;i++){
-        fill.localToWorld(point.fromBufferAttribute(positions,i)).project(app.pet.camera);
-        bounds.expandByPoint(new THREE.Vector2(point.x*initialCanvas.width,point.y*initialCanvas.height));
-      }
-      const size=bounds.getSize(new THREE.Vector2()),ratio=size.x/size.y;
-      check(ratio>.9&&ratio<1.2,'vacant eye remains round after the actual camera and body transforms: '+ratio.toFixed(3));
-    }
-    check(ropeEnd.distanceTo(end)<.001&&app.pet.group.position.y>.2&&app.pet.shadow.material.opacity<1,'rope stays attached to the raised ball and the ground shadow softens');
-  }
-  const forehead=app.pet.body.deform(0,.65,Math.sqrt(1-.65*.65));
+  check((await native('testSnapshot',{name:'mood-'+mood.id+'.png'})).ok,'expression reference screenshot '+mood.id);
+  // Sample clear body at the side; new head wraps and large vacant eyes cover the forehead.
+  const forehead=app.pet.body.deform(.74,-.26,Math.sqrt(1-.74*.74-.26*.26));
   const sample=app.pet.mesh.localToWorld(new THREE.Vector3(forehead.x,forehead.y,forehead.z)).project(app.pet.camera),bodyPixel=new Uint8Array(4);
   gl.readPixels(Math.round((sample.x*.5+.5)*initialCanvas.width),Math.round((sample.y*.5+.5)*initialCanvas.height),1,1,gl.RGBA,gl.UNSIGNED_BYTE,bodyPixel);
   const brightest=Math.max(...bodyPixel.slice(0,3)),saturation=(brightest-Math.min(...bodyPixel.slice(0,3)))/Math.max(1,brightest);
@@ -279,23 +258,34 @@ for(const mood of MoodModel.moods){
   check(tintInfo.petTint.toLowerCase()==='#'+app.pet.color.getHexString(),'notification bubble follows the rendered pet color for '+mood.id);
   if(mood.id==='tired'){
     check(newFace.eyes.every(e=>e.open<.55)&&!newFace.yawn&&!app.pet.grin.visible,'fatigue uses heavy low eyelids and a slack closed mouth without a permanent yawn');
-    check(app.pet.group.scale.y<.93&&app.pet.group.scale.x>1&&app.pet.group.position.y<0,'exhaustion has a grounded slouched silhouette instead of a sleepy upright pose');
+    check(app.pet.body.restHeight===.85&&app.pet.body.restWidth>1,'exhaustion has a grounded slouched silhouette instead of a sleepy upright pose');
   }
   if(mood.id==='sleepy')check(newFace.yawn.mesh.visible&&newFace.tongue.mesh.visible&&newFace.eyes.every(e=>e.shadow.mesh.visible&&e.shadow.mesh.material.transparent&&e.open<.3)&&app.pet.color.getHexString()==='7892ac','sleepy has soft black circles, relaxed lids, a small pink yawn and the existing dusty blue');
   if(mood.id==='calm')check(newFace.eyes.every(e=>e.white.mesh.visible&&e.iris.mesh.visible)&&newFace.parts.filter(p=>p.mesh.material===app.pet.studyGlass).length===5,'calm has clear gentle eyes and five large black glasses parts');
   if(mood.id==='anxious')check(newFace.eyes[0].w!==newFace.eyes[1].w&&newFace.eyes.every(e=>e.iris.mesh.material.onBeforeCompile),'anxiety has asymmetric eyes and pupils clipped to the eye aperture');
   if(mood.id==='resigned')check(newFace.eyes.every(e=>e.dy>0)&&newFace.eyes[0].v!==newFace.eyes[1].v,'resigned combines upward gaze and asymmetric eye placement');
   if(mood.id==='speechless')check(newFace.eyes.every(e=>e.dx>.1&&e.open<.5)&&app.pet.cheeks.every(c=>!c.visible)&&newFace.group.children.length>newFace.parts.length,'speechless has half-lidded side-eye, a question mark and no blush');
-  if(newFace){
+  if(newFace&&mood.id!=='overwhelmed'){
     const clock=app.pet.clock,reduced=app.pet.reduced;
-    app.pet.reduced={matches:false};app.pet.clock=mood.id==='sleepy'?4.9:3.94;app.pet.draw();
+    app.pet.reduced={matches:false};app.pet.clock=['sleepy','sick','headache','verytired'].includes(mood.id)?4.9:3.94;app.pet.draw();
     check(newFace.eyes.every(e=>e.upper===e.lower&&!e.white.mesh.visible&&!e.iris.mesh.visible&&!e.glint.mesh.visible&&e.lid.mesh.visible),'fully closed '+mood.id+' eyes show a single soft lid without sclera or highlights');
     app.pet.clock=1;app.pet.draw();check(newFace.eyes.every(e=>e.white.mesh.visible&&e.iris.mesh.visible),'eyes reopen after blinking: '+mood.id);
     app.pet.reduced={matches:true};app.pet.clock=2;app.pet.draw();const stillEyes=JSON.stringify(newFace.eyes.map(e=>[e.dx,e.dy,e.open]));app.pet.clock=9;app.pet.draw();
     check(JSON.stringify(newFace.eyes.map(e=>[e.dx,e.dy,e.open]))===stillEyes,'reduced motion freezes the new face: '+mood.id);
     app.pet.reduced=reduced;app.pet.clock=clock;app.pet.draw();
   }
-  if(mood.id==='overwhelmed')check(app.pet.overwhelmedMouth.visible&&app.pet.expressionEyes.every(e=>e.userData.profile.pupilHeight<e.userData.profile.height*.4&&e.userData.parts.glints.every(g=>!g.visible)),'overwhelmed has wide vacant eyes, small matte pupils and the selected flat mouth');
+  if(mood.id==='overwhelmed'){
+    check(newFace.tongue.mesh.visible&&newFace.bow.length===3&&newFace.eyes.every(e=>!e.glint.mesh.visible),'deflated overwhelmed has vacant eyes, a drooping tongue and top bow');
+    check(app.pet.body.restHeight===.43&&app.pet.body.restWidth===1.32,'overwhelmed has the lowest widest emotional rest pose');
+    const head=app.pet.body.deform(0,1,0),end=app.pet.group.localToWorld(new THREE.Vector3(head.x,head.y,head.z));
+    const ropeEnd=app.pet.rope.localToWorld(new THREE.Vector3(0,.5,0));
+    check(ropeEnd.distanceTo(end)<.001,'charm cord remains attached to the actual deformed top');
+  }
+  if(mood.id==='headache')check(newFace.wraps.length===2&&newFace.wraps.every(m=>m.visible),'headache wears two overlapping white head wraps');
+  if(mood.id==='coding')check(newFace.headband.visible&&newFace.keyboard.visible&&newFace.keys.length===27&&newFace.hands.length===2&&newFace.parts.filter(p=>p.mesh.material===app.pet.studyGlass).length===5,'immersive coding has black glasses, headphones, a 3D keyboard and two typing hands');
+  if(mood.id==='sick')check(newFace.thermometer.mesh.visible&&newFace.sickMouth.mesh.visible&&newFace.heat.length===2,'sick has a 3D thermometer, slack mouth and heat wisps');
+  if(mood.id==='verytired')check(newFace.slackMouth.mesh.visible&&newFace.eyes[0].v<newFace.eyes[1].v&&newFace.eyes.every(e=>!e.glint.mesh.visible)&&app.pet.body.restHeight<.85,'very tired has asymmetric sagging eyes, slack mouth and a lower rest pose');
+  if(['happy','angry'].includes(mood.id))check(app.pet.body.restHeight>1&&app.pet.body.restWidth>1,'joy and anger keep a full body: '+mood.id);
   if(mood.id==='angry')check(app.pet.grittedMouth.visible&&app.pet.teeth.length===10&&app.pet.teeth.every(t=>t.visible)&&app.pet.angryEyes.every(e=>e.visible)&&app.pet.expressionEyes.every(e=>!e.visible),'exaggerated annoyance combines narrowed angled eyes, gritted mouth and ten block teeth');
   if(mood.id==='angry'){
     const savedYaw=app.pet.group.rotation.y;
@@ -309,9 +299,8 @@ for(const mood of MoodModel.moods){
     }
     app.pet.group.rotation.y=savedYaw;app.pet.draw();
   }
-  check((await native('testSnapshot',{name:'mood-'+mood.id+'.png'})).ok,'expression reference screenshot '+mood.id);
 }
-check(eyeKinds.size===10,'all ten states have distinct eye acting');
+check(eyeKinds.size===14,'all fourteen states have distinct eye acting');
 app.pet.setMood('overwhelmed');app.pet.draw();
 const ropePosition=app.pet.group.position.clone(),ropeClock=app.pet.clock,ropeReduced=app.pet.reduced;
 app.pet.clock+=1;app.pet.draw();
@@ -339,7 +328,7 @@ while(!app.pet.reduced.matches&&!app.pet.studyFaces.anxious.eyes.every(e=>e.dx<0
 check(app.pet.reduced.matches||app.pet.studyFaces.anxious.eyes.every(e=>e.dx<0),'anxious eyes follow a pointer back to the left');
 app.pet.lookTarget.set(0,0);app.pet.attentionUntil=0;
 
-for(const [mood,label] of [['resigned','无奈'],['speechless','无语'],['overwhelmed','要死了'],['sleepy','好困']]){
+for(const [mood,label] of [['resigned','无奈'],['speechless','无语'],['overwhelmed','要死了'],['sleepy','好困'],['tired','轻微疲惫'],['verytired','非常疲惫'],['headache','头痛'],['sick','生病'],['coding','沉浸开发']]){
   const count=app.snapshot().events.length;
   check((await native('testMenuCommand',{command:'mood:'+mood})).ok,'native menu saves new mood '+mood);
   check(app.snapshot().events.length===count+1&&app.snapshot().events.at(-1).mood===mood,'new mood survives native persistence '+mood);

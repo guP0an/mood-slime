@@ -2,6 +2,11 @@
   'use strict';
   const T=window.THREE,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const profiles={
+    coding:{w:.175,h:.18,iris:[.105,.13],open:.88,gaze:[.01,-.035]},
+    headache:{w:.235,h:.23,iris:[.11,.14],open:.58,gaze:[-.015,-.035]},
+    overwhelmed:{w:.34,h:.45,iris:[.033,.041],open:1,gaze:[-.025,.19]},
+    verytired:{w:.29,h:.23,iris:[.145,.16],open:.34,gaze:[.075,-.065]},
+    sick:{w:.25,h:.19,iris:[.118,.13],open:.53,gaze:[.02,-.035]},
     calm:{w:.18,h:.19,iris:[.116,.14],open:.91,gaze:[.035,.005]},
     sad:{w:.205,h:.245,iris:[.12,.145],open:.97,gaze:[0,-.075]},
     anxious:{w:.205,h:.245,iris:[.064,.08],open:1,gaze:[-.055,.005]},
@@ -14,7 +19,7 @@
   function acting(mood,time,attending,px,py,reduced){
     const p=profiles[mood];if(!p)return null;
     const pose={x:p.gaze[0],y:p.gaze[1],open:p.open,yawn:0};
-    if(reduced)return pose;
+    if(reduced||mood==='overwhelmed')return pose;
     if(attending){pose.x=clamp(px,-1,1)*.10;pose.y+=clamp(py,-1,1)*.07;}
     else if(mood==='anxious'){
       // Pauses at each destination make a worried glance readable.
@@ -23,7 +28,7 @@
       const a=points[index],b=points[(index+1)%points.length];
       pose.x=a[0]+(b[0]-a[0])*t;pose.y=a[1]+(b[1]-a[1])*t;
     }else if(mood==='calm'){pose.x+=Math.sin(time*.4)*.012;}
-    const sleepy=mood==='sleepy',phase=time%(sleepy?7.2:6.1);
+    const sleepy=['sleepy','sick','headache','verytired'].includes(mood),phase=time%(sleepy?7.2:6.1);
     const start=sleepy?4.4:3.8,close=sleepy?.42:.12,hold=sleepy?.14:.03,open=sleepy?.65:.22;
     let blink=0;
     if(phase>=start&&phase<start+close)blink=smooth((phase-start)/close);
@@ -76,23 +81,36 @@
           float edge=sqrt(max(0.0,1.0-pow(vFaceCoordinate.x/eyeOpening.x,2.0)));
           if(abs(vFaceCoordinate.x)>eyeOpening.x || vFaceCoordinate.y>eyeOpening.y*eyeOpening.z*edge || vFaceCoordinate.y < eyeOpening.y*eyeFloor*edge) discard;`);
         shader.uniforms.eyeFloor=eye.floorUniform;
-        shader.fragmentShader='uniform float eyeFloor;\n'+shader.fragmentShader;
+        shader.uniforms.eyeSlope=eye.slopeUniform;
+        shader.uniforms.eyeArc=eye.arcUniform;
+        shader.fragmentShader='uniform float eyeFloor; uniform float eyeSlope; uniform float eyeArc;\n'+shader.fragmentShader;
+        shader.fragmentShader=shader.fragmentShader.replace('float edge=sqrt','float eyeY=vFaceCoordinate.y-vFaceCoordinate.x*eyeSlope;\nfloat edge=sqrt').replaceAll('vFaceCoordinate.y>','eyeY>').replaceAll('vFaceCoordinate.y <','eyeY <');
+        shader.fragmentShader=shader.fragmentShader.replace('eyeOpening.z*edge','eyeOpening.z*mix(edge,edge*edge,eyeArc)');
       };
       material.customProgramCacheKey=()=> 'study-eye-opening-v1';return material;
     }
     buildEye(face,side){
-      const p=face.profile,scale=face.mood==='anxious'&&side>0?.85:face.mood==='resigned'&&side<0?.94:1;
+      const p=face.profile,scale=face.mood==='overwhelmed'&&side>0?.92:face.mood==='sick'&&side>0?.92:face.mood==='anxious'&&side>0?.85:face.mood==='resigned'&&side<0?.94:1;
       const eye={w:p.w*scale,h:p.h*scale,u:side*.365,v:.16,open:p.open,upper:2*p.open-1,lower:-1,dx:0,dy:0};
+      if(face.mood==='sick')eye.v+=side>0?-.026:.015;
+      if(face.mood==='verytired')eye.v+=side<0?-.065:.035;
+      if(face.mood==='headache')eye.v+=side>0?-.025:.01;
+      if(face.mood==='overwhelmed'){eye.u=side*.36;eye.v=side<0?.20:.35;}
       if(face.mood==='resigned')eye.v+=side*.018;
       if(face.mood==='anxious')eye.v+=side<0?.02:-.02;
       eye.uniform={value:new T.Vector3(eye.w,eye.h,2*eye.open-1)};
       eye.floorUniform={value:-1};
-      eye.white=this.add(face,new T.CircleGeometry(1,64),this.studyWhite,eye.u,eye.v,.049);
+      eye.slope=face.mood==='verytired'?(side<0?.20:-.10):0;eye.slopeUniform={value:eye.slope};
+      eye.parabolic=face.mood==='verytired';eye.arcUniform={value:eye.parabolic?1:0};
+      // Interior rings follow the curved body; a single triangle fan cuts into large eyes.
+      eye.white=this.add(face,new T.RingGeometry(0,1,64,6),this.studyWhite,eye.u,eye.v,.049);
+      eye.disk=Float32Array.from(eye.white.rest);
       eye.outline=this.curve(face,t=>{
         const angle=t*Math.PI*2,x=eye.w*Math.cos(angle),sin=Math.sin(angle);
-        return [x,eye.h*Math.abs(sin)*(sin>=0?eye.upper:eye.lower),0];
+        const arc=sin>=0&&eye.parabolic?sin*sin:Math.abs(sin);
+        return [x,eye.h*arc*(sin>=0?eye.upper:eye.lower)+eye.slope*x,0];
       },eye.u,eye.v,.004,.067,64);
-      eye.lid=this.curve(face,t=>[-eye.w*Math.cos(t*Math.PI),eye.h*eye.upper*Math.sin(t*Math.PI),0],eye.u,eye.v,.006,.069);
+      eye.lid=this.curve(face,t=>{const x=-eye.w*Math.cos(t*Math.PI),arc=Math.sin(t*Math.PI);return[x,eye.h*eye.upper*(eye.parabolic?arc*arc:arc)+eye.slope*x,0];},eye.u,eye.v,.006,.069);
       eye.iris=this.add(face,new T.SphereGeometry(1,32,20),this.eyeMaterial(eye,0x5A4030),eye.u,eye.v,.072);
       eye.iris.scale=[p.iris[0]*scale,p.iris[1]*scale,.016];
       eye.glint=this.add(face,new T.SphereGeometry(.019,12,8),this.eyeMaterial(eye,0xFFF5DC),eye.u,eye.v,.094);
@@ -102,7 +120,7 @@
       if(face.mood==='sad'){
         eye.tear=this.add(face,new T.SphereGeometry(1,24,12),this.studyTear,eye.u,eye.v-eye.h+.022,.09);eye.tear.scale=[.115,.028,.021];
       }
-      if(face.mood==='sleepy'){
+      if(['sleepy','verytired'].includes(face.mood)){
         const shadow=new T.ShaderMaterial({
           uniforms:{tint:{value:new T.Color(0x514A68)}},transparent:true,depthWrite:false,toneMapped:false,
           vertexShader:'varying vec2 eyeShadowUv; void main(){eyeShadowUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
@@ -116,25 +134,40 @@
             }`
         });
         eye.shadow=this.add(face,new T.PlaneGeometry(eye.w*2.3,.16,24,8),shadow,eye.u,eye.v-eye.h-.055,.035);
+        if(face.mood==='verytired'){
+          shadow.uniforms.tint.value.set(0x8B738F);
+          shadow.fragmentShader=shadow.fragmentShader.replace('*.54','*.27');
+          eye.shadow.mesh.geometry.dispose();eye.shadow.mesh.geometry=new T.PlaneGeometry(eye.w*2.2,.24,24,8);
+          eye.shadow.rest=Float32Array.from(eye.shadow.mesh.geometry.attributes.position.array);eye.shadow.v=eye.v-eye.h-.025;
+        }
+      }
+      if(face.mood==='sick'){
+        eye.glint.scale=[.55,.55,.55];
+        eye.rim=this.curve(face,t=>[-eye.w*Math.cos(t*Math.PI),-eye.h*Math.sin(t*Math.PI),0],eye.u,eye.v,.008,.066);
+        eye.rim.mesh.material=new T.MeshBasicMaterial({color:0xBE8278,toneMapped:false,transparent:true,opacity:.68});
       }
       face.eyes.push(eye);
-      const lift=face.mood==='calm'?.46:face.mood==='sleepy'?.37:.46;
+      const lift=face.mood==='calm'?.46:face.mood==='sleepy'?.37:face.mood==='verytired'?.49:face.mood==='overwhelmed'?.78:.46;
       this.curve(face,t=>{
         const x=(t-.5)*.22,arch=Math.sin(t*Math.PI)*.02;
         let y=arch;
+        if(face.mood==='sick')y=-side*x*.32+Math.sin(t*Math.PI*2)*.009;
+        if(face.mood==='headache')y=-side*x*.42+Math.sin(t*Math.PI)*.017;
+        if(face.mood==='overwhelmed')y=side>0?-x*.2:0;
         if(face.mood==='sad')y+=-side*x*.55;
         if(face.mood==='anxious')y+=-side*x*.38+(side>0?.015:0);
-        if(face.mood==='tired')y+=-side*x*.26-.025;
+        if(['tired','verytired'].includes(face.mood))y+=-side*x*.26-.025;
+        if(face.mood==='verytired')y=-side*x*.33+Math.sin(t*Math.PI)*.014;
         if(face.mood==='resigned')y+=-side*x*.40+side*.02;
         if(face.mood==='speechless')y=side>0?arch+.025:0;
         return [x,y,0];
-      },eye.u,lift,.006,.035);
+      },eye.u,lift+(face.mood==='verytired'?(side<0?-.035:.025):0),.006,.035);
     }
     buildFaces(){
       for(const [mood,profile] of Object.entries(profiles)){
         const face={mood,profile,group:new T.Group(),parts:[],eyes:[]};this.studyFaces[mood]=face;this.group.add(face.group);
         this.buildEye(face,-1);this.buildEye(face,1);
-        if(mood==='calm'){
+        if(mood==='calm'||mood==='coding'){
           for(const side of [-1,1]){
             const w=.32,h=.265,r=.10,shape=new T.Shape();
             shape.moveTo(-w+r,h);shape.lineTo(w-r,h);shape.quadraticCurveTo(w,h,w,h-r);shape.lineTo(w,-h+r);shape.quadraticCurveTo(w,-h,w-r,-h);shape.lineTo(-w+r,-h);shape.quadraticCurveTo(-w,-h,-w,-h+r);shape.lineTo(-w,h-r);shape.quadraticCurveTo(-w,h,-w+r,h);
@@ -144,7 +177,18 @@
           }
           const bridge=this.curve(face,t=>[(t-.5)*.13,Math.sin(Math.PI*t)*.022,0],0,.14,.017,.13,20);bridge.mesh.material=this.studyGlass;
         }
-        if(mood==='sleepy'){
+        if(mood==='coding')this.buildCodingProps(face);
+        if(mood==='headache'){this.buildHeadWrap(face);}
+        if(mood==='overwhelmed'){this.buildDeflatedFace(face);}
+        else if(mood==='verytired'){
+          const shape=new T.Shape();shape.moveTo(-.10,-.006);shape.bezierCurveTo(-.095,.037,.065,.045,.10,.007);shape.bezierCurveTo(.105,-.023,-.065,-.018,-.10,-.006);
+          face.slackMouth=this.add(face,new T.ShapeGeometry(shape,32),new T.MeshBasicMaterial({color:0x9E7D87,toneMapped:false,transparent:true}),.012,-.28,.05);
+          this.curve(face,t=>{const p=shape.getPoint(t);return[p.x,p.y,0];},.012,-.28,.004,.056,48);
+          const sigh=this.curve(face,t=>{const a=-Math.PI*.6+t*Math.PI*1.5;return[.047*Math.cos(a),.033*Math.sin(a),0];},.235,-.30,.0035,.035,32);
+          sigh.mesh.material=new T.MeshBasicMaterial({color:0xA99A9F,toneMapped:false,transparent:true,opacity:.55});
+          const breath=this.curve(face,t=>[-.05+t*.065,-.01*Math.sin(t*Math.PI),0],.16,-.305,.003,.036,18);breath.mesh.material=sigh.mesh.material;
+        }else if(mood==='sick'){this.buildSickProps(face);}
+        else if(mood==='sleepy'){
           const shape=new T.Shape();shape.absellipse(0,0,.058,.082,0,Math.PI*2,false);
           const material=new T.MeshBasicMaterial({color:0xA36C70,toneMapped:false,transparent:true});
           face.yawn=this.add(face,new T.ShapeGeometry(shape,32),material,0,-.255,.052);
@@ -160,6 +204,7 @@
             if(mood==='tired')y=Math.sin(t*Math.PI)*.004-x*.035;
             if(mood==='resigned')y=Math.sin(t*Math.PI*2)*.009-x*.06;
             if(mood==='speechless')y=Math.sin(t*Math.PI)*.007;
+            if(mood==='headache')y=Math.sin(t*Math.PI)*.025-x*.06;
             return [x,y,0];
           },mood==='resigned'?.025:0,mood==='calm'?-.25:-.29,.005,.045);
         }
@@ -176,6 +221,93 @@
         face.group.visible=false;
       }
     }
+    mappedFaceMesh(face,geometry,material){
+      const mesh=this.deformable(geometry,material);face.group.add(mesh);return mesh;
+    }
+    buildCodingProps(face){
+      const shell=new T.MeshStandardMaterial({color:0x303844,roughness:.5,transparent:true});
+      const cushion=new T.MeshStandardMaterial({color:0xEEE2CD,roughness:.9,transparent:true});
+      const band=new T.Curve();band.getPoint=t=>new T.Vector3(Math.cos(t*Math.PI)*1.035,.14+Math.sin(t*Math.PI)*.93,.035);
+      face.headband=this.mappedFaceMesh(face,new T.TubeGeometry(band,64,.045,10,false),shell);
+      for(const side of [-1,1]){
+        const cup=new T.SphereGeometry(1,24,16);cup.scale(.13,.245,.18);cup.translate(side*1.03,.16,.045);
+        this.mappedFaceMesh(face,cup,shell);
+        const pad=new T.SphereGeometry(1,20,14);pad.scale(.043,.18,.125);pad.translate(side*.94,.16,.06);this.mappedFaceMesh(face,pad,cushion);
+      }
+      face.keyboard=new T.Group();face.keyboard.position.set(0,-.75,1.62);face.keyboard.rotation.x=.45;face.group.add(face.keyboard);
+      const board=new T.Mesh(new T.BoxGeometry(1.30,.075,.42),shell);face.keyboard.add(board);
+      const keyMat=new T.MeshStandardMaterial({color:0xE1D9CB,roughness:.75,transparent:true});face.keys=[];
+      for(let row=0;row<3;row++)for(let col=0;col<9;col++){
+        const key=new T.Mesh(new T.BoxGeometry(.11,.025,.085),keyMat);key.position.set((col-4)*.135,.05,(row-1)*.115);face.keyboard.add(key);face.keys.push(key);
+      }
+      face.hands=[];
+      for(const side of [-1,1]){
+        const hand=new T.Mesh(new T.SphereGeometry(1,20,12),new T.MeshStandardMaterial({color:0x9ABEC4,roughness:.45,transparent:true}));hand.scale.set(.105,.065,.085);hand.position.set(side*.30,-.665,1.70);face.group.add(hand);face.hands.push(hand);
+      }
+    }
+    buildHeadWrap(face){
+      const cloth=new T.MeshStandardMaterial({color:0xF4EEE2,roughness:.95,transparent:true});
+      face.wraps=[];
+      for(const [theta,length,angle] of [[.60,.40,-.20],[.32,.26,.22]]){
+        const geometry=new T.SphereGeometry(1.025,64,10,0,Math.PI*2,theta,length);
+        geometry.rotateZ(angle);face.wraps.push(this.mappedFaceMesh(face,geometry,cloth));
+      }
+      const edge=new T.MeshBasicMaterial({color:0xDED7CA,toneMapped:false,transparent:true});
+      for(const theta of [.60,1.0]){
+        const path=new T.Curve();path.getPoint=t=>new T.Vector3(Math.cos(t*Math.PI*2)*Math.sin(theta)*1.028,Math.cos(theta)*1.028,Math.sin(t*Math.PI*2)*Math.sin(theta)*1.028).applyAxisAngle(new T.Vector3(0,0,1),-.20);
+        this.mappedFaceMesh(face,new T.TubeGeometry(path,96,.004,6,true),edge);
+      }
+    }
+    buildDeflatedFace(face){
+      const curve=new T.Curve();curve.getPoint=t=>new T.Vector3((t-.5)*.40,Math.sin(t*Math.PI*2)*.012,0);
+      face.flatMouth=this.curve(face,t=>{const p=curve.getPoint(t);return[p.x,p.y,0];},.015,-.32,.006,.055);
+      const tongue=new T.Shape();tongue.moveTo(-.035,.01);tongue.quadraticCurveTo(.07,.025,.09,-.18);tongue.quadraticCurveTo(.11,-.38,.02,-.38);tongue.quadraticCurveTo(-.025,-.38,-.035,.01);
+      face.tongue=this.add(face,new T.ExtrudeGeometry(tongue,{depth:.02,bevelEnabled:true,bevelThickness:.005,bevelSize:.005,bevelSegments:2}),new T.MeshBasicMaterial({color:0xD79C9F,toneMapped:false,transparent:true}),.18,-.325,.076);
+      const cordMat=new T.MeshStandardMaterial({color:0xC4AA83,roughness:.9,transparent:true});
+      face.bow=[];
+      for(const side of [-1,1]){
+        const path=new T.CubicBezierCurve3(new T.Vector3(0,1.01,.015),new T.Vector3(side*.16,1.20,.015),new T.Vector3(side*.19,1.02,.02),new T.Vector3(0,1.01,.015));
+        face.bow.push(this.mappedFaceMesh(face,new T.TubeGeometry(path,32,.018,8,false),cordMat));
+      }
+      const knot=new T.SphereGeometry(.035,16,12);knot.translate(0,1.02,.02);
+      face.bow.push(this.mappedFaceMesh(face,knot,cordMat));
+    }
+    buildSickProps(face){
+      const T=window.THREE;
+      const blush=new T.ShaderMaterial({transparent:true,depthWrite:false,toneMapped:false,
+        uniforms:{tint:{value:new T.Color(0xDA746D)}},
+        vertexShader:'varying vec2 blushUv; void main(){blushUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+        fragmentShader:`varying vec2 blushUv; uniform vec3 tint; void main(){float r=length((blushUv-.5)*2.0);float a=exp(-r*r*3.5)*smoothstep(1.0,.65,r)*.48;gl_FragColor=vec4(tint,a);
+#include <colorspace_fragment>
+}`});
+      for(const side of [-1,1])this.add(face,new T.PlaneGeometry(.47,.27,20,12),blush,side*.43,-.095,.035);
+      const mouth=new T.Shape();mouth.moveTo(-.13,-.006);
+      mouth.bezierCurveTo(-.11,.065,.015,.07,.10,-.014);
+      mouth.bezierCurveTo(.035,-.005,-.035,-.06,-.13,-.006);
+      const mouthMat=new T.MeshBasicMaterial({color:0xA86860,toneMapped:false,transparent:true});
+      face.sickMouth=this.add(face,new T.ShapeGeometry(mouth,32),mouthMat,0,-.265,.055);
+      this.curve(face,t=>{const p=mouth.getPoint(t);return[p.x,p.y,0];},0,-.265,.005,.06,64);
+      const anchor={u:.075,v:-.278},angle=-.56;
+      function orient(geometry,x,y=0){geometry.rotateZ(angle);geometry.translate(Math.cos(angle)*x-Math.sin(angle)*y,Math.sin(angle)*x+Math.cos(angle)*y,0);return geometry;}
+      const white=new T.MeshPhysicalMaterial({color:0xF4ECE0,roughness:.4,clearcoat:.25,transparent:true});
+      const coral=new T.MeshBasicMaterial({color:0xCF817C,toneMapped:false,transparent:true});
+      const screen=new T.MeshBasicMaterial({color:0x91A6AF,toneMapped:false,transparent:true});
+      const handle=new T.CapsuleGeometry(.046,.19,6,12);handle.rotateZ(-Math.PI/2);
+      face.thermometer=this.add(face,orient(handle,.25),white,anchor.u,anchor.v,.10);
+      const stem=new T.CapsuleGeometry(.015,.105,4,10);stem.rotateZ(-Math.PI/2);
+      this.add(face,orient(stem,.055),white,anchor.u,anchor.v,.085);
+      face.thermometerTip=this.add(face,orient(new T.SphereGeometry(1,18,12).scale(.039,.045,.025),.373),coral,anchor.u,anchor.v,.12);
+      this.add(face,orient(new T.BoxGeometry(.105,.039,.008),.25),screen,anchor.u,anchor.v,.15);
+      face.thermometerRoot=anchor;
+      const drop=new T.Shape();drop.moveTo(0,.075);drop.bezierCurveTo(-.055,-.02,-.04,-.065,0,-.065);drop.bezierCurveTo(.04,-.065,.055,-.02,0,.075);
+      this.add(face,new T.ExtrudeGeometry(drop,{depth:.008,bevelEnabled:true,bevelSize:.005,bevelThickness:.005,bevelSegments:2}),this.studyTear,.66,.48,.05);
+      face.heat=[];
+      const heatMat=new T.MeshBasicMaterial({color:0xCD9180,toneMapped:false,transparent:true,opacity:.26});
+      for(const x of [-.12,.14]){
+        const curve=new T.CubicBezierCurve3(new T.Vector3(0,0,0),new T.Vector3(-.06,.06,0),new T.Vector3(.06,.1,0),new T.Vector3(0,.18,0));
+        const heat=new T.Mesh(new T.TubeGeometry(curve,24,.009,6,false),heatMat);heat.position.set(x,1.1,.12);face.group.add(heat);face.heat.push(heat);
+      }
+    }
     attachFeatures(){
       super.attachFeatures();if(!this.studyFaces)return;
       const face=this.studyFaces[this.mood],active=!!(face&&!this.image&&!this.facialState.hurt);
@@ -184,21 +316,30 @@
       this.features.forEach(f=>f.visible=false);
       const pose=acting(this.mood,this.clock,this.clock<this.attentionUntil,this.lookTarget.x/.3,this.lookTarget.y/.15,this.reduced.matches||!!this.body.hold);
       this.studyState.pose=pose;
+      if(face.hands){
+        const moving=!this.reduced.matches&&!this.body.hold;
+        face.hands.forEach((hand,i)=>hand.position.y=-.665+(moving?Math.sin(this.clock*9+i*Math.PI)*.018:0));
+        face.keys.forEach((key,i)=>key.position.y=.05-(moving&&i===Math.floor(this.clock*6)%face.keys.length?.012:0));
+      }
       for(const eye of face.eyes){
-        eye.open=pose.open;
-        const closure=1-clamp(eye.open/face.profile.open,0,1);
+        const restingRatio=this.mood==='sick'&&eye.u>0?.82:this.mood==='headache'&&eye.u<0?.80:1;
+        eye.open=pose.open*restingRatio;
+        const closure=1-clamp(pose.open/face.profile.open,0,1);
         // Both lids meet near the eye center instead of rolling the upper lid to the bottom.
-        eye.upper=(2*face.profile.open-1)*(1-closure)-.08*closure;
+        eye.upper=(2*face.profile.open*restingRatio-1)*(1-closure)-.08*closure;
         eye.lower=-(1-closure)-.08*closure;
         eye.uniform.value.set(eye.w,eye.h,eye.upper);eye.floorUniform.value=eye.lower;
         const visible=eye.open/face.profile.open>.035;
         for(const part of [eye.white,eye.outline,eye.iris,eye.glint])part.mesh.visible=visible;
+        if(eye.rim)eye.rim.mesh.visible=visible;
+        if(['verytired','overwhelmed'].includes(this.mood))eye.glint.mesh.visible=false;
         eye.dx=clamp(pose.x,-eye.w*.68,eye.w*.68);eye.dy=clamp(pose.y,-eye.h*.65,eye.h*.55);
         const a=eye.white.rest;
-        a[0]=0;a[1]=eye.h*(eye.upper+eye.lower)/2;a[2]=0;
-        for(let i=1;i<a.length/3;i++){
-          const angle=(i-1)/64*Math.PI*2,sin=Math.sin(angle);
-          a[i*3]=eye.w*Math.cos(angle);a[i*3+1]=eye.h*Math.abs(sin)*(sin>=0?eye.upper:eye.lower);a[i*3+2]=0;
+        for(let i=0;i<a.length/3;i++){
+          const x=eye.disk[i*3],y=eye.disk[i*3+1],r=Math.hypot(x,y);
+          const arc=y>=0&&eye.parabolic?(r?y*y/r:0):Math.abs(y);
+          a[i*3]=eye.w*x;
+          a[i*3+1]=eye.h*(arc*(y>=0?eye.upper:eye.lower)+(1-r)*(eye.upper+eye.lower)/2)+eye.slope*a[i*3];a[i*3+2]=0;
         }
       }
       const out={};

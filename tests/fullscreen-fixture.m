@@ -5,7 +5,7 @@
 @property NSWindow *window;
 @property NSTimer *sampler;
 @property BOOL entered;
-@property NSUInteger samples,consecutive;
+@property NSUInteger samples,consecutive,activationAttempts;
 @property NSDictionary *lastSample;
 @end
 @implementation OverlayFixture
@@ -38,6 +38,10 @@
     if(pet)CGRectMakeWithDictionaryRepresentation((__bridge CFDictionaryRef)pet[(__bridge NSString *)kCGWindowBounds],&petRect);
     if(fixture)CGRectMakeWithDictionaryRepresentation((__bridge CFDictionaryRef)fixture[(__bridge NSString *)kCGWindowBounds],&fixtureRect);
     BOOL front=NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier==getpid();
+    if(!front&&self.activationAttempts<2&&self.samples%10==0){
+        self.activationAttempts++;
+        [self.window makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];
+    }
     BOOL full=(self.window.styleMask&NSWindowStyleMaskFullScreen)!=0;
     BOOL above=pet&&fixture&&petIndex<fixtureIndex&&CGRectIntersectsRect(petRect,fixtureRect)&&[pet[(__bridge NSString *)kCGWindowAlpha] doubleValue]>.9;
     self.samples++;self.consecutive=front&&full&&above?self.consecutive+1:0;

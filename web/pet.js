@@ -360,7 +360,7 @@
     setMood(mood) {
       if(this.mood!==mood)this.moodChangedAt=this.clock;
       this.mood=mood;
-      const colors={calm:'#79B994',happy:'#FFDA70',sad:'#79A9D2',anxious:'#A68ACB',angry:'#D97E69',tired:'#9B8DB2',resigned:'#BEA16F',speechless:'#79AFB8',overwhelmed:'#9D96AA',sleepy:'#7892AC'};
+      const colors={calm:'#79B994',happy:'#FFDA70',sad:'#79A9D2',anxious:'#A68ACB',angry:'#D97E69',tired:'#9B8DB2',resigned:'#BEA16F',speechless:'#79AFB8',overwhelmed:'#9D96AA',sleepy:'#7892AC',verytired:'#9B8DB2',headache:'#C48F9A',sick:'#DDB898',coding:'#6F9FAA'};
       this.color.set(colors[mood]||colors.calm);
       window.webkit?.messageHandlers?.mood?.postMessage({id:0,action:'petTint',color:colors[mood]||colors.calm});
       if(this.material)this.material.color.copy(this.color);
@@ -472,7 +472,8 @@
     draw() {
       if(!this.renderer||this.contextLost)return;
       const out={};
-      const pose=this.body.values.map(v=>v.toFixed(5)).join(',');
+      this.body.setRestPose(this.image?'calm':this.mood);
+      const pose=[this.body.restHeight,this.body.restWidth,...this.body.values].map(v=>v.toFixed(5)).join(',');
       if(pose!==this.geometryPose)for(const {mesh,rest} of this.mapped) {
         const positions=mesh.geometry.attributes.position;
         for(let i=0;i<positions.count;i++){const j=i*3;this.body.deform(rest[j],rest[j+1],rest[j+2],out);positions.setXYZ(i,out.x,out.y,out.z);}
@@ -497,17 +498,16 @@
       const expressive=!this.reduced.matches&&!this.body.hold;
       const joy=expressive&&this.facialState?.laugh?Math.sin(this.clock*8)*.014:0;
       const breath=!expressive?0:Math.sin(this.clock*(['tired','sleepy'].includes(this.mood)?1.25:2.05))*.016+joy;
-      const slouch=this.facialState?.exhausted&&!this.body.hold;
       const suspended=!this.image&&this.mood==='overwhelmed'&&!this.body.hold&&!this.rolling.moving;
-      const sleepyPose=this.mood==='sleepy'&&!this.body.hold,bodyY=slouch?.88:sleepyPose?1.02:1.12;
-      this.group.scale.set((1-breath*.5)*(slouch?1.055:sleepyPose?1.05:1),(1+breath)*bodyY,(1-breath*.5)*(slouch?1.035:1));
+      const sleepyPose=this.mood==='sleepy'&&!this.body.hold,bodyY=sleepyPose?1.02:1.12;
+      this.group.scale.set((1-breath*.5)*(sleepyPose?1.05:1),(1+breath)*bodyY,1-breath*.5);
       this.group.position.y=-.78*(1-bodyY);
       this.group.position.x=0;
       this.group.rotation.y=this.reduced.matches?0:this.look.x+Math.sin(this.clock*.64)*.055;
       this.group.rotation.x=this.reduced.matches?0:-this.look.y+(sleepyPose?Math.sin(this.clock*.7)*.035:0);
       const tilt=this.mood==='sleepy'?-.09:this.mood==='sad'?-.045:this.mood==='tired'?.06:this.mood==='anxious'?.035:this.mood==='resigned'?-.065:0;
       this.group.rotation.z=(!expressive?0:tilt+Math.sin(this.clock*.82)*.022+joy*.8+(this.facialState?.angry?Math.sin(this.clock*11)*.006:0))+(this.reduced.matches?0:this.rolling.angle);
-      if(suspended){this.group.position.y+=.16;this.group.position.x=-Math.sin(this.group.rotation.z)*.55;}
+      if(suspended){this.group.position.x=-Math.sin(this.group.rotation.z)*.20;}
       if(this.rolling.moving){
         const positions=(this.image?this.skinMesh:this.mesh).geometry.attributes.position;
         let bottom=Infinity;const point=new T.Vector3();
@@ -522,8 +522,8 @@
         this.rope.scale.y=direction.length();this.rope.material.map.repeat.y=this.rope.scale.y*2;
         this.rope.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),direction.normalize());
       }
-      this.shadow.material.opacity=suspended?.55:1;
-      this.shadow.scale.x=this.body.sx*(suspended?.85:1);
+      this.shadow.material.opacity=1;
+      this.shadow.scale.x=this.body.sx*this.body.restWidth;
       this.renderer.render(this.scene,this.camera);
     }
   }

@@ -38,3 +38,15 @@ leftRoll.reset();assert(!leftRoll.moving);
 for(const [x,y,r] of [[NaN,0,80],[1,0,0],[Infinity,1,50],[10000,0,80]])leftRoll.move(x,y,r);
 assert(!leftRoll.moving,'invalid movement and screen teleports do not spin');
 console.log('PASS: rolling direction, rest/upright recovery, 600 interrupted moves, reset and teleport rejection');
+
+for(const mood of ['calm','happy','angry','tired','verytired','overwhelmed','headache','sick']){
+  s.values.fill(0);s.velocity.fill(0);s.prepare();s.setRestPose(mood);
+  const base=s.deform(0,-1,0),top=s.deform(0,1,0);
+  assert(top.y>base.y,'positive resting height');
+  positiveJacobian(s,.2,-.1,.5);
+  s.grab(250,200);step(120);s.release();step(1200);
+  assert(s.settled,'gesture returns to its emotional rest pose');
+}
+const heights=['happy','tired','verytired','overwhelmed'].map(m=>{s.setRestPose(m);return s.deform(0,1,0).y-s.deform(0,-1,0).y;});
+assert(heights.every((h,i)=>i===0||h<heights[i-1]),'fatigue and overwhelmed have increasingly deflated silhouettes');
+console.log('PASS: emotional rest poses retain positive volume and recover after gestures');

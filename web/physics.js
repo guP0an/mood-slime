@@ -10,6 +10,7 @@
       this.values = [0, 0, 0];
       this.velocity = [0, 0, 0];
       this.targetPress = 0;
+      this.restHeight=1;this.restWidth=1;
       this.prepare();
     }
     grab(x, y) {
@@ -61,9 +62,11 @@
       x *= fullness;
       z *= fullness;
       y = (y < -.72 ? -.72+(y+.72)*.32 : y)*.95;
+      x*=this.restWidth;z*=this.restWidth;
+      y=FLOOR+(y-FLOOR)*this.restHeight;
       x *= this.sx; z *= this.sx;
       y = FLOOR+(y-FLOOR)*this.sy;
-      const centerY = FLOOR+(.03-FLOOR)*this.sy;
+      const centerY = FLOOR+(.03-FLOOR)*this.sy*this.restHeight;
       const projection = x*this.ax+(y-centerY)*this.ay;
       const extension = projection*(this.expansion-this.contraction)
         +Math.tanh(projection*1.4)*this.pull*.13+this.pull*.06;
@@ -71,6 +74,10 @@
       out.y = centerY+(y-centerY)*this.contraction+this.ay*extension;
       out.z = z*this.contraction;
       return out;
+    }
+    setRestPose(mood){
+      this.restHeight=({tired:.85,verytired:.67,overwhelmed:.43,sick:.91,headache:.96,happy:1.04,angry:1.05})[mood]||1;
+      this.restWidth=({tired:1.055,verytired:1.15,overwhelmed:1.32,sick:1.025,headache:1.015,happy:1.025,angry:1.04})[mood]||1;
     }
     resize(x, y, r) { this.release(); this.x=x; this.y=y; this.r=Math.max(1,r); }
     get press() { return Math.max(0,this.squash); }
