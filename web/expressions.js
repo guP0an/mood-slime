@@ -4,7 +4,6 @@
   const profiles={
     coding:{w:.175,h:.18,iris:[.105,.13],open:.88,gaze:[.01,-.035]},
     headache:{w:.235,h:.23,iris:[.11,.14],open:.58,gaze:[-.015,-.035]},
-    overwhelmed:{w:.225,h:.275,iris:[.034,.043],open:.91,gaze:[-.015,.065]},
     verytired:{w:.29,h:.23,iris:[.145,.16],open:.34,gaze:[.075,-.065]},
     sick:{w:.25,h:.19,iris:[.118,.13],open:.53,gaze:[.02,-.035]},
     calm:{w:.18,h:.19,iris:[.116,.14],open:.91,gaze:[.035,.005]},
@@ -19,7 +18,7 @@
   function acting(mood,time,attending,px,py,reduced){
     const p=profiles[mood];if(!p)return null;
     const pose={x:p.gaze[0],y:p.gaze[1],open:p.open,yawn:0};
-    if(reduced||mood==='overwhelmed')return pose;
+    if(reduced)return pose;
     if(attending){pose.x=clamp(px,-1,1)*.10;pose.y+=clamp(py,-1,1)*.07;}
     else if(mood==='anxious'){
       // Pauses at each destination make a worried glance readable.
@@ -90,12 +89,11 @@
       material.customProgramCacheKey=()=> 'study-eye-opening-v1';return material;
     }
     buildEye(face,side){
-      const p=face.profile,scale=face.mood==='overwhelmed'&&side>0?.92:face.mood==='sick'&&side>0?.92:face.mood==='anxious'&&side>0?.85:face.mood==='resigned'&&side<0?.94:1;
+      const p=face.profile,scale=face.mood==='sick'&&side>0?.92:face.mood==='anxious'&&side>0?.85:face.mood==='resigned'&&side<0?.94:1;
       const eye={w:p.w*scale,h:p.h*scale,u:side*.365,v:.16,open:p.open,upper:2*p.open-1,lower:-1,dx:0,dy:0};
       if(face.mood==='sick')eye.v+=side>0?-.026:.015;
       if(face.mood==='verytired')eye.v+=side<0?-.065:.035;
       if(face.mood==='headache')eye.v+=side>0?-.025:.01;
-      if(face.mood==='overwhelmed'){eye.u=side*.31;eye.v=side<0?.17:.24;}
       if(face.mood==='resigned')eye.v+=side*.018;
       if(face.mood==='anxious')eye.v+=side<0?.02:-.02;
       eye.uniform={value:new T.Vector3(eye.w,eye.h,2*eye.open-1)};
@@ -147,13 +145,12 @@
         eye.rim.mesh.material=new T.MeshBasicMaterial({color:0xBE8278,toneMapped:false,transparent:true,opacity:.68});
       }
       face.eyes.push(eye);
-      const lift=face.mood==='calm'?.46:face.mood==='sleepy'?.37:face.mood==='verytired'?.49:face.mood==='overwhelmed'?.57:.46;
+      const lift=face.mood==='calm'?.46:face.mood==='sleepy'?.37:face.mood==='verytired'?.49:.46;
       this.curve(face,t=>{
         const x=(t-.5)*.22,arch=Math.sin(t*Math.PI)*.02;
         let y=arch;
         if(face.mood==='sick')y=-side*x*.32+Math.sin(t*Math.PI*2)*.009;
         if(face.mood==='headache')y=-side*x*.42+Math.sin(t*Math.PI)*.017;
-        if(face.mood==='overwhelmed')y=side>0?-x*.2:0;
         if(face.mood==='sad')y+=-side*x*.55;
         if(face.mood==='anxious')y+=-side*x*.38+(side>0?.015:0);
         if(['tired','verytired'].includes(face.mood))y+=-side*x*.26-.025;
@@ -179,8 +176,7 @@
         }
         if(mood==='coding')this.buildCodingProps(face);
         if(mood==='headache'){this.buildHeadWrap(face);}
-        if(mood==='overwhelmed'){this.buildDeflatedFace(face);}
-        else if(mood==='verytired'){
+        if(mood==='verytired'){
           const shape=new T.Shape();shape.moveTo(-.10,-.006);shape.bezierCurveTo(-.095,.037,.065,.045,.10,.007);shape.bezierCurveTo(.105,-.023,-.065,-.018,-.10,-.006);
           face.slackMouth=this.add(face,new T.ShapeGeometry(shape,32),new T.MeshBasicMaterial({color:0x9E7D87,toneMapped:false,transparent:true}),.012,-.28,.05);
           this.curve(face,t=>{const p=shape.getPoint(t);return[p.x,p.y,0];},.012,-.28,.004,.056,48);
@@ -258,20 +254,6 @@
         this.mappedFaceMesh(face,new T.TubeGeometry(path,96,.004,6,true),edge);
       }
     }
-    buildDeflatedFace(face){
-      const curve=new T.Curve();curve.getPoint=t=>new T.Vector3((t-.5)*.40,Math.sin(t*Math.PI*2)*.012,0);
-      face.flatMouth=this.curve(face,t=>{const p=curve.getPoint(t);return[p.x,p.y,0];},.015,-.24,.005,.055);
-      const tongue=new T.Shape();tongue.moveTo(0,0);tongue.quadraticCurveTo(.085,.02,.105,-.14);tongue.quadraticCurveTo(.135,-.30,.045,-.30);tongue.quadraticCurveTo(0,-.29,0,0);
-      face.tongue=this.add(face,new T.ExtrudeGeometry(tongue,{depth:.02,bevelEnabled:true,bevelThickness:.005,bevelSize:.005,bevelSegments:2}),new T.MeshBasicMaterial({color:0xD79C9F,toneMapped:false,transparent:true}),.20,-.24,.076);
-      const cordMat=new T.MeshStandardMaterial({color:0xC4AA83,roughness:.9,transparent:true});
-      face.bow=[];
-      for(const side of [-1,1]){
-        const path=new T.CubicBezierCurve3(new T.Vector3(0,1.01,.015),new T.Vector3(side*.16,1.20,.015),new T.Vector3(side*.19,1.02,.02),new T.Vector3(0,1.01,.015));
-        face.bow.push(this.mappedFaceMesh(face,new T.TubeGeometry(path,32,.018,8,false),cordMat));
-      }
-      const knot=new T.SphereGeometry(.035,16,12);knot.translate(0,1.02,.02);
-      face.bow.push(this.mappedFaceMesh(face,knot,cordMat));
-    }
     buildSickProps(face){
       const T=window.THREE;
       const blush=new T.ShaderMaterial({transparent:true,depthWrite:false,toneMapped:false,
@@ -332,7 +314,7 @@
         const visible=eye.open/face.profile.open>.035;
         for(const part of [eye.white,eye.outline,eye.iris,eye.glint])part.mesh.visible=visible;
         if(eye.rim)eye.rim.mesh.visible=visible;
-        if(['verytired','overwhelmed'].includes(this.mood))eye.glint.mesh.visible=false;
+        if(this.mood==='verytired')eye.glint.mesh.visible=false;
         eye.dx=clamp(pose.x,-eye.w*.68,eye.w*.68);eye.dy=clamp(pose.y,-eye.h*.65,eye.h*.55);
         const a=eye.white.rest;
         for(let i=0;i<a.length/3;i++){

@@ -10,7 +10,7 @@
       this.values = [0, 0, 0];
       this.velocity = [0, 0, 0];
       this.targetPress = 0;
-      this.restHeight=1;this.restWidth=1;this.restMood='calm';
+      this.restHeight=1;this.restWidth=1;
       this.prepare();
     }
     grab(x, y) {
@@ -63,8 +63,7 @@
       z *= fullness;
       y = (y < -.72 ? -.72+(y+.72)*.32 : y)*.95;
       x*=this.restWidth;z*=this.restWidth;
-      const sag=this.restMood==='overwhelmed'?1-.10*clamp(x,-1,1):1;
-      y=FLOOR+(y-FLOOR)*this.restHeight*sag;
+      y=FLOOR+(y-FLOOR)*this.restHeight;
       x *= this.sx; z *= this.sx;
       y = FLOOR+(y-FLOOR)*this.sy;
       const centerY = FLOOR+(.03-FLOOR)*this.sy*this.restHeight;
@@ -77,9 +76,8 @@
       return out;
     }
     setRestPose(mood){
-      this.restMood=mood;
-      this.restHeight=({tired:.85,verytired:.67,overwhelmed:.57,sick:.91,headache:.96,happy:1.04,angry:1.05})[mood]||1;
-      this.restWidth=({tired:1.055,verytired:1.15,overwhelmed:1.20,sick:1.025,headache:1.015,happy:1.025,angry:1.04})[mood]||1;
+      this.restHeight=({tired:.85,verytired:.67,sick:.91,headache:.96,happy:1.04,angry:1.05})[mood]||1;
+      this.restWidth=({tired:1.055,verytired:1.15,sick:1.025,headache:1.015,happy:1.025,angry:1.04})[mood]||1;
     }
     resize(x, y, r) { this.release(); this.x=x; this.y=y; this.r=Math.max(1,r); }
     get press() { return Math.max(0,this.squash); }

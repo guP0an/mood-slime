@@ -38,11 +38,11 @@
       this.setupLighting();this.setupBody();this.setupFace();this.setupBandages();this.setupShadow();
       this.ropeTop=new T.Vector3(0,2.2,0);
       const ropeTexture=makeTexture(64,128,(c,w,h)=>{
-        c.fillStyle='#CBB78F';c.fillRect(0,0,w,h);c.strokeStyle='#A58D68';c.lineWidth=5;
+        c.fillStyle='#B59A65';c.fillRect(0,0,w,h);c.strokeStyle='#76603C';c.lineWidth=9;
         for(let y=-64;y<h;y+=32){c.beginPath();c.moveTo(0,y);c.lineTo(w,y+32);c.stroke();}
       });
       ropeTexture.wrapS=T.RepeatWrapping;ropeTexture.wrapT=T.RepeatWrapping;
-      this.rope=new T.Mesh(new T.CylinderGeometry(.020,.020,1,12),new T.MeshBasicMaterial({map:ropeTexture,toneMapped:false,transparent:true}));
+      this.rope=new T.Mesh(new T.CylinderGeometry(.045,.045,1,12),new T.MeshBasicMaterial({map:ropeTexture,toneMapped:false,transparent:true}));
       this.rope.visible=false;this.scene.add(this.rope);
       this.bindInput();
       new ResizeObserver(()=>this.resize()).observe(canvas);
@@ -507,7 +507,7 @@
       this.group.rotation.x=this.reduced.matches?0:-this.look.y+(sleepyPose?Math.sin(this.clock*.7)*.035:0);
       const tilt=this.mood==='sleepy'?-.09:this.mood==='sad'?-.045:this.mood==='tired'?.06:this.mood==='anxious'?.035:this.mood==='resigned'?-.065:0;
       this.group.rotation.z=(!expressive?0:tilt+Math.sin(this.clock*.82)*.022+joy*.8+(this.facialState?.angry?Math.sin(this.clock*11)*.006:0))+(this.reduced.matches?0:this.rolling.angle);
-      if(suspended){this.group.position.x=-Math.sin(this.group.rotation.z)*.20;}
+      if(suspended){this.group.position.y+=.16;this.group.position.x=-Math.sin(this.group.rotation.z)*.55;}
       if(this.rolling.moving){
         const positions=(this.image?this.skinMesh:this.mesh).geometry.attributes.position;
         let bottom=Infinity;const point=new T.Vector3();
@@ -522,8 +522,8 @@
         this.rope.scale.y=direction.length();this.rope.material.map.repeat.y=this.rope.scale.y*2;
         this.rope.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),direction.normalize());
       }
-      this.shadow.material.opacity=1;
-      this.shadow.scale.x=this.body.sx*this.body.restWidth;
+      this.shadow.material.opacity=suspended?.55:1;
+      this.shadow.scale.x=this.body.sx*this.body.restWidth*(suspended?.85:1);
       this.renderer.render(this.scene,this.camera);
     }
   }

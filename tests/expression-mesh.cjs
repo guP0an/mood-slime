@@ -13,8 +13,8 @@ class BaseFixture {
 context.MoodPet=BaseFixture;
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/expressions.js'),'utf8'),context);
 const {profiles,acting}=context.window.MoodExpressions,pet=new context.window.MoodPet();
-assert.equal(Object.keys(pet.studyFaces).length,12);
-for(const mood of ['happy','angry']){
+assert.equal(Object.keys(pet.studyFaces).length,11);
+for(const mood of ['happy','angry','overwhelmed']){
   pet.mood=mood;pet.attachFeatures();assert.equal(pet.studyState.active,false);
   assert(pet.features.every(f=>f.visible));assert(Object.values(pet.studyFaces).every(f=>f.group.visible===false),'Three.js only skips visible === false; undefined renders every face');
 }
@@ -60,21 +60,20 @@ for(const mood of Object.keys(profiles)){
   }
 }
 // Exercise transitions after every new face, including the protected original moods.
-for(const from of Object.keys(profiles))for(const to of ['happy','angry']){
+for(const from of Object.keys(profiles))for(const to of ['happy','angry','overwhelmed']){
   pet.mood=from;pet.attachFeatures();pet.mood=to;pet.attachFeatures();
   for(const face of Object.values(pet.studyFaces))assert.equal(face.group.visible,false,from+' -> '+to+' must hide all new face groups');
 }
 assert(acting('calm',3.94,false,0,0,false).open<.1,'blink closes the lid, not the whole eye scale');
 assert.equal(acting('anxious',.1,false,0,0,false).x,acting('anxious',.5,false,0,0,false).x,'anxious gaze holds between movements');
 for(const mood of Object.keys(profiles)){
-  if(mood==='overwhelmed'){assert.deepEqual(acting(mood,2,true,1,0,false),acting(mood,5,true,-1,0,false),'vacant eyes stay unfocused');continue;}
   assert(acting(mood,2,true,1,0,false).x>0);
   assert(acting(mood,2,true,-1,0,false).x<0);
 }
 const html=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
 assert(html.indexOf('pet.js')<html.indexOf('expressions.js')&&html.indexOf('expressions.js')<html.indexOf('app.js'),'new face class loads before the app creates its pet');
-console.log('PASS: 12 3D faces, 2 protected faces, squeeze/stretch geometry, closed/reopened lids, skin/injury override, black circles, reduced motion, pointer direction and load order');
+console.log('PASS: 11 3D faces, 3 protected faces, squeeze/stretch geometry, closed/reopened lids, skin/injury override, black circles, reduced motion, pointer direction and load order');
 
-assert(pet.studyFaces.headache.wraps.length===2);assert(pet.studyFaces.sick.thermometer);assert(pet.studyFaces.overwhelmed.bow.length===3);
+assert(pet.studyFaces.headache.wraps.length===2);assert(pet.studyFaces.sick.thermometer);
 assert(pet.studyFaces.coding.keyboard.position.z>1.5,'keyboard leaves a visible gap in front of the body');
 assert(pet.studyFaces.coding.hands.every(h=>h.position.z>1.5),'typing hands follow the moved keyboard');

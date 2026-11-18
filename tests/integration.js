@@ -275,11 +275,27 @@ for(const mood of MoodModel.moods){
     app.pet.reduced=reduced;app.pet.clock=clock;app.pet.draw();
   }
   if(mood.id==='overwhelmed'){
-    check(newFace.tongue.mesh.visible&&newFace.bow.length===3&&newFace.eyes.every(e=>!e.glint.mesh.visible),'deflated overwhelmed has vacant eyes, a drooping tongue and top bow');
-    check(app.pet.body.restHeight===.57&&app.pet.body.restWidth===1.20,'overwhelmed stays softly deflated with volume instead of a flat disc');
+    const mouthCorner=app.pet.overwhelmedMouth.localToWorld(app.pet.overwhelmedMouth.children[0].geometry.parameters.path.getPoint(1));
+    const tongueRoot=app.pet.overwhelmedTongue.localToWorld(new THREE.Vector3(0,0,.006));
+    check(tongueRoot.distanceTo(mouthCorner)<.001,'tongue root remains attached to the actual mouth endpoint');
+    const tonguePoint=app.pet.overwhelmedTongue.localToWorld(new THREE.Vector3(0,-.04,.012)).project(app.pet.camera),tonguePixel=new Uint8Array(4);
+    gl.readPixels(Math.round((tonguePoint.x*.5+.5)*initialCanvas.width),Math.round((tonguePoint.y*.5+.5)*initialCanvas.height),1,1,gl.RGBA,gl.UNSIGNED_BYTE,tonguePixel);
+    check(app.pet.overwhelmedTongue.parent===app.pet.overwhelmedMouth&&tonguePixel[3]===255&&tonguePixel[0]>tonguePixel[1]+30&&tonguePixel[2]>tonguePixel[1],'overwhelmed tongue hangs from one mouth corner and renders pink');
     const head=app.pet.body.deform(0,1,0),end=app.pet.group.localToWorld(new THREE.Vector3(head.x,head.y,head.z));
     const ropeEnd=app.pet.rope.localToWorld(new THREE.Vector3(0,.5,0));
-    check(ropeEnd.distanceTo(end)<.001,'charm cord remains attached to the actual deformed top');
+    const ropeWidth=new THREE.Box3().setFromObject(app.pet.rope).getSize(new THREE.Vector3()).x,ballWidth=new THREE.Box3().setFromObject(app.pet.mesh).getSize(new THREE.Vector3()).x;
+    check(ropeWidth/ballWidth>.035&&app.pet.rope.material.map!==null,'hanging rope has visible thickness and a twisted-fiber texture');
+    check(app.pet.expressionEyes[1].position.y-app.pet.expressionEyes[0].position.y>.1,'vacant eyes retain the reference height difference');
+    for(const eye of app.pet.expressionEyes){
+      const fill=eye.userData.parts.shell.userData.fill,positions=fill.geometry.attributes.position,bounds=new THREE.Box2(),point=new THREE.Vector3();
+      for(let i=0;i<positions.count;i++){
+        fill.localToWorld(point.fromBufferAttribute(positions,i)).project(app.pet.camera);
+        bounds.expandByPoint(new THREE.Vector2(point.x*initialCanvas.width,point.y*initialCanvas.height));
+      }
+      const size=bounds.getSize(new THREE.Vector2()),ratio=size.x/size.y;
+      check(ratio>.9&&ratio<1.2,'vacant eye remains round after the actual camera and body transforms: '+ratio.toFixed(3));
+    }
+    check(ropeEnd.distanceTo(end)<.001&&app.pet.group.position.y>.2&&app.pet.shadow.material.opacity<1,'rope stays attached to the raised ball and the ground shadow softens');
   }
   if(mood.id==='headache')check(newFace.wraps.length===2&&newFace.wraps.every(m=>m.visible),'headache wears two overlapping white head wraps');
   if(mood.id==='coding')check(newFace.headband.visible&&newFace.keyboard.visible&&newFace.keys.length===27&&newFace.hands.length===2&&newFace.parts.filter(p=>p.mesh.material===app.pet.studyGlass).length===5,'immersive coding has black glasses, headphones, a 3D keyboard and two typing hands');
