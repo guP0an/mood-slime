@@ -236,11 +236,26 @@
       face.smile=this.add(face,new T.ShapeGeometry(grin,40),new T.MeshBasicMaterial({color:0xFFF3D8,toneMapped:false,transparent:true}),.035,-.21,.06);
       this.curve(face,t=>{const p=grin.getPoint(t);return[p.x,p.y,0];},.035,-.21,.008,.065,64);
       const gold=new T.MeshStandardMaterial({color:0xEFC15D,metalness:.45,roughness:.3,transparent:true});
-      face.crown=new T.Group();face.crown.position.set(-.12,.91,-.04);face.crown.rotation.z=.20;face.group.add(face.crown);
-      const crownShape=new T.Shape();crownShape.moveTo(-.28,0);crownShape.lineTo(-.33,.24);crownShape.lineTo(-.13,.14);crownShape.lineTo(0,.35);crownShape.lineTo(.13,.14);crownShape.lineTo(.33,.24);crownShape.lineTo(.28,0);crownShape.closePath();
-      const crown=new T.Mesh(new T.ExtrudeGeometry(crownShape,{depth:.11,bevelEnabled:true,bevelSize:.018,bevelThickness:.018,bevelSegments:3}),gold);face.crown.add(crown);
-      const band=new T.Mesh(new T.CapsuleGeometry(.033,.50,5,16),gold);band.rotation.z=Math.PI/2;band.position.set(0,.03,.065);face.crown.add(band);
-      const gem=new T.Mesh(new T.OctahedronGeometry(.055),new T.MeshStandardMaterial({color:0xD76D61,metalness:.1,roughness:.25,transparent:true}));gem.position.set(0,.12,.14);gem.scale.set(1,1.2,.45);face.crown.add(gem);
+      const red=new T.MeshPhysicalMaterial({color:0xD9232E,roughness:.24,clearcoat:.65,transparent:true});
+      const roasted=new T.MeshStandardMaterial({color:0xC87831,roughness:.55,transparent:true});
+      const bone=new T.MeshStandardMaterial({color:0xFFF0D4,roughness:.7,transparent:true});
+      face.liftingArms=[];face.drumsticks=[];
+      for(const side of [-1,1]){
+        const arm=new T.Group();arm.position.set(side*.72,.14,.20);face.group.add(arm);face.liftingArms.push(arm);
+        const shoulder=new T.Vector3(0,0,0),elbow=new T.Vector3(side*.25,.32,.12),wrist=new T.Vector3(side*.05,.73,.22);
+        for(const [a,b,r] of [[shoulder,elbow,.09],[elbow,wrist,.075]]){
+          const direction=new T.Vector3().subVectors(b,a);
+          const limb=new T.Mesh(new T.CapsuleGeometry(r,Math.max(.01,direction.length()-r*2),6,16),red);
+          limb.position.copy(a).add(b).multiplyScalar(.5);limb.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),direction.normalize());arm.add(limb);
+        }
+        const drumstick=new T.Group();drumstick.position.copy(wrist);drumstick.rotation.z=-side*.24;arm.add(drumstick);face.drumsticks.push(drumstick);
+        const shaft=new T.Mesh(new T.CapsuleGeometry(.037,.22,5,16),bone);shaft.position.y=.02;drumstick.add(shaft);
+        for(const x of [-.027,.027]){const nub=new T.Mesh(new T.SphereGeometry(.045,16,12),bone);nub.position.set(x,-.12,0);drumstick.add(nub);}
+        const meat=new T.Mesh(new T.SphereGeometry(1,32,24),roasted);meat.scale.set(.16,.225,.135);meat.position.set(0,.25,0);drumstick.add(meat);
+        const taper=new T.Mesh(new T.SphereGeometry(1,24,16),roasted);taper.scale.set(.085,.12,.08);taper.position.set(0,.09,0);drumstick.add(taper);
+        const fist=new T.Mesh(new T.SphereGeometry(1,24,16),red);fist.scale.set(.12,.10,.095);fist.position.copy(wrist);fist.position.z+=.045;arm.add(fist);
+        const thumb=new T.Mesh(new T.SphereGeometry(1,18,12),red);thumb.scale.set(.055,.065,.05);thumb.position.copy(fist.position);thumb.position.x-=side*.07;thumb.position.z+=.04;arm.add(thumb);
+      }
       face.sparkles=[];
       for(const [x,y,size] of [[.99,.46,.105],[-.98,.08,.065]]){
         const starShape=new T.Shape();starShape.moveTo(0,size);starShape.quadraticCurveTo(size*.2,size*.2,size,0);starShape.quadraticCurveTo(size*.2,-size*.2,0,-size);starShape.quadraticCurveTo(-size*.2,-size*.2,-size,0);starShape.quadraticCurveTo(-size*.2,size*.2,0,size);
@@ -391,6 +406,7 @@
       if(face.sparkles){
         const moving=!this.reduced.matches&&!this.body.hold;
         face.sparkles.forEach((star,i)=>star.scale.setScalar(moving?1+Math.sin(this.clock*2+i*Math.PI)*.10:1));
+        face.liftingArms.forEach((arm,i)=>arm.rotation.z=moving?(i===0?-1:1)*Math.sin(this.clock*1.6)*.025:0);
       }
       if(face.fish){
         const moving=!this.reduced.matches&&!this.body.hold;

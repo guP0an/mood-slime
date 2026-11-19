@@ -107,7 +107,9 @@ assert(smileEnd[1]-smileStart[1]>.05,'right smile corner curls upward');
 assert(smileCenter[1]<smileStart[1]-.08,'smile has a rounded lower sweep');
 
 const confident=pet.studyFaces.confident;
-assert(confident&&confident.crown&&confident.sparkles.length===2,'confidence has a tilted crown and two sparkles');
+assert(confident&&confident.liftingArms?.length===2&&confident.drumsticks?.length===2&&confident.sparkles.length===2,'confidence raises two chicken drumsticks like a weightlifting champion');
+assert(!confident.crown,'red champion replaces the previous crown concept');
+for(const drumstick of confident.drumsticks)assert(drumstick.position.y>.65,'chicken is held above shoulder level');
 pet.mood='confident';pet.clock=1;pet.reduced={matches:false};pet.attachFeatures();
 assert(confident.eyes[0].v!==confident.eyes[1].v,'confident eyes have asymmetric placement');
 assert(confident.smile.mesh.geometry.type==='ShapeGeometry','confidence has a shaped ivory grin');

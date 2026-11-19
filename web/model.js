@@ -17,7 +17,7 @@
     {id:'coding', name:'沉浸开发', color:'#79A5AE', ink:'#426A75'},
     {id:'jailed', name:'坐牢', color:'#8E96BC', ink:'#5B607C'},
     {id:'slacking', name:'摸摸鱼', color:'#A6BD64', ink:'#657B39'},
-    {id:'confident', name:'当红炸子鸡', color:'#E3A04F', ink:'#946124'}
+    {id:'confident', name:'当红炸子鸡', color:'#D9232E', ink:'#9B2834'}
   ];
   const moodById = Object.fromEntries(moods.map(m=>[m.id,m]));
   function dayKey(date = new Date()) {

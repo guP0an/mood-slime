@@ -244,7 +244,7 @@ for(const mood of MoodModel.moods){
   const sample=app.pet.mesh.localToWorld(new THREE.Vector3(forehead.x,forehead.y,forehead.z)).project(app.pet.camera),bodyPixel=new Uint8Array(4);
   gl.readPixels(Math.round((sample.x*.5+.5)*initialCanvas.width),Math.round((sample.y*.5+.5)*initialCanvas.height),1,1,gl.RGBA,gl.UNSIGNED_BYTE,bodyPixel);
   const brightest=Math.max(...bodyPixel.slice(0,3)),saturation=(brightest-Math.min(...bodyPixel.slice(0,3)))/Math.max(1,brightest);
-  check(bodyPixel[3]>=220&&brightest>150&&saturation>.025&&saturation<.55,'rendered '+mood.id+' jelly stays visible and softly colored without oversaturation: '+saturation.toFixed(3));
+  check(bodyPixel[3]>=220&&brightest>150&&saturation>.025&&saturation<(mood.id==='confident'?.9:.55),'rendered '+mood.id+' jelly stays visible and softly colored without oversaturation: '+saturation.toFixed(3));
   const newFace=app.pet.studyFaces[mood.id];
   check(Object.values(app.pet.studyFaces).filter(f=>f.group.visible!==false).length===(newFace?1:0),'exactly the selected face is visible without overlays: '+mood.id);
   if(newFace)check(newFace.group.visible&&app.pet.features.every(f=>f.visible===false),'new face replaces all legacy facial parts: '+mood.id);
@@ -302,7 +302,7 @@ for(const mood of MoodModel.moods){
     check(ropeEnd.distanceTo(end)<.001&&app.pet.group.position.y>.2&&app.pet.shadow.material.opacity<1,'rope stays attached to the raised ball and the ground shadow softens');
   }
   if(mood.id==='headache')check(newFace.wraps.length===2&&newFace.wraps.every(m=>m.visible),'headache wears two overlapping white head wraps');
-  if(mood.id==='confident')check(newFace.crown.visible&&newFace.sparkles.length===2&&newFace.eyes[0].v!==newFace.eyes[1].v&&newFace.smile.mesh.visible,'confidence wears a tilted crown, asymmetric eyes, ivory grin and two stars');
+  if(mood.id==='confident')check(newFace.liftingArms.length===2&&newFace.drumsticks.length===2&&!newFace.crown&&newFace.sparkles.length===2&&newFace.smile.mesh.visible&&app.pet.color.getHexString()==='d9232e'&&bodyPixel[0]>bodyPixel[1]*1.3&&bodyPixel[0]>bodyPixel[2]*1.3,'red champion raises two drumsticks with an ivory grin and celebratory stars');
   if(mood.id==='slacking'){
     check(newFace.fish.visible&&newFace.hands.length===2&&app.pet.color.getHexString()==='a6bd64','slacking has a blue 3D fish, two hands and yellow green body');
     const clock=app.pet.clock,reduced=app.pet.reduced;app.pet.reduced={matches:false};app.pet.clock=1;app.pet.draw();const hand=newFace.hands[1].position.clone();app.pet.clock=1.6;app.pet.draw();check(hand.distanceTo(newFace.hands[1].position)>.01,'slacking hand really strokes fish in native renderer');
