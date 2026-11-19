@@ -314,6 +314,7 @@ for(const mood of MoodModel.moods){
   if(mood.id==='slacking'){
     check(newFace.fish.visible&&newFace.hands.length===2&&app.pet.color.getHexString()==='a6bd64','slacking has a blue 3D fish, two hands and yellow green body');
     const clock=app.pet.clock,reduced=app.pet.reduced;app.pet.reduced={matches:false};app.pet.clock=1;app.pet.draw();const hand=newFace.hands[1].position.clone();app.pet.clock=1.6;app.pet.draw();check(hand.distanceTo(newFace.hands[1].position)>.01,'slacking hand really strokes fish in native renderer');
+    app.pet.clock=Math.PI/2/2.4;app.pet.draw();const strokeRight=newFace.hands[1].position.x;app.pet.clock=Math.PI*1.5/2.4;app.pet.draw();check(strokeRight-newFace.hands[1].position.x>.37,'petting visibly crosses a third of the fish length in the native renderer');
     app.pet.reduced={matches:true};app.pet.draw();const restingHand=newFace.hands[1].position.clone(),tail=newFace.fishTail.rotation.y;app.pet.clock=10;app.pet.draw();check(restingHand.distanceTo(newFace.hands[1].position)===0&&tail===newFace.fishTail.rotation.y,'reduced motion freezes fish and hand');app.pet.reduced=reduced;app.pet.clock=clock;app.pet.draw();
   }
   if(mood.id==='jailed')check(newFace.bars.length===5&&newFace.hands.length===2&&newFace.hands.every(h=>h.position.y===-.40)&&newFace.grin.mesh.geometry.type==='TubeGeometry'&&app.pet.color.getHexString()==='8e96bc','jailed has five bars, two fixed hands, closed mouth and selected blue purple');

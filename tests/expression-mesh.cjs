@@ -95,6 +95,15 @@ const firstStroke=slacking.hands[1].position.clone(),firstTail=slacking.fishTail
 pet.clock=1.6;pet.attachFeatures();
 assert(slacking.hands[1].position.distanceTo(firstStroke)>.01,'petting hand strokes over time');
 assert(Math.abs(slacking.fishTail.rotation.y-firstTail)>.01,'fish tail gently moves');
+const strokeXs=[];
+for(let i=0;i<=60;i++){
+ pet.clock=i/60*(Math.PI*2/2.4);pet.attachFeatures();const h=slacking.hands[1];strokeXs.push(h.position.x);
+ assert(h.position.x>=.015&&h.position.x<=.405,'petting stays over the fish and clear of the other hand');
+ const fishBack=-.65+.19*Math.sqrt(1-(h.position.x/.56)**2);
+ assert(Math.abs(h.position.y-fishBack-.055)<.002,'hand follows the curved back instead of floating or sinking');
+}
+assert(Math.max(...strokeXs)-Math.min(...strokeXs)>.37,'petting stroke spans at least one third of the fish length');
+
 pet.reduced={matches:true};pet.attachFeatures();const stillHand=slacking.hands[1].position.clone(),stillTail=slacking.fishTail.rotation.y;
 pet.clock=12;pet.attachFeatures();assert.equal(slacking.hands[1].position.distanceTo(stillHand),0);assert.equal(slacking.fishTail.rotation.y,stillTail);
 pet.reduced={matches:false};pet.body.grab(pet.body.x,pet.body.y);pet.attachFeatures();const heldHand=slacking.hands[1].position.clone();pet.clock=14;pet.attachFeatures();assert.equal(slacking.hands[1].position.distanceTo(heldHand),0,'holding body stops petting');pet.body.release();

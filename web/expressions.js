@@ -478,9 +478,9 @@
       if(face.fish){
         const moving=!this.reduced.matches&&!this.body.hold;
         const stroke=moving?Math.sin(this.clock*2.4):0;
-        face.hands[1].position.x=.28+stroke*.065;
-        face.hands[1].position.y=-.47+(moving?(1-Math.cos(this.clock*2.4))*.012:0);
-        face.hands[1].rotation.z=stroke*.10;
+        const hand=face.hands[1],x=moving?.21+stroke*.19:.28;
+        hand.position.set(x,-.65+.19*Math.sqrt(1-(x/.56)**2)+.055,1.57);
+        hand.rotation.z=stroke*.18;
         face.fishTail.rotation.y=moving?Math.sin(this.clock*3.2)*.18:0;
       }
       for(const eye of face.eyes){
