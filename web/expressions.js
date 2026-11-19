@@ -2,6 +2,8 @@
   'use strict';
   const T=window.THREE,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const profiles={
+    confident:{w:.205,h:.18,iris:[.092,.11],open:.80,gaze:[.045,.025]},
+    slacking:{w:.235,h:.245,iris:[.092,.11],open:1,gaze:[-.055,-.025]},
     jailed:{w:.18,h:.21,iris:[.09,.125],open:.64,gaze:[0,-.025]},
     coding:{w:.175,h:.18,iris:[.105,.13],open:.88,gaze:[.01,-.035]},
     headache:{w:.235,h:.23,iris:[.11,.14],open:.58,gaze:[-.015,-.035]},
@@ -95,6 +97,8 @@
       if(face.mood==='sick')eye.v+=side>0?-.026:.015;
       if(face.mood==='verytired')eye.v+=side<0?-.065:.035;
       if(face.mood==='headache')eye.v+=side>0?-.025:.01;
+      if(face.mood==='confident'){eye.v+=side>0?.045:-.01;}
+      if(face.mood==='slacking'){eye.u=side*.285;eye.v=side>0?.31:.34;}
       if(face.mood==='jailed'){eye.u=side*.27;eye.v=side>0?.13:.16;}
       if(face.mood==='resigned')eye.v+=side*.018;
       if(face.mood==='anxious')eye.v+=side<0?.02:-.02;
@@ -153,6 +157,7 @@
         let y=arch;
         if(face.mood==='sick')y=-side*x*.32+Math.sin(t*Math.PI*2)*.009;
         if(face.mood==='headache')y=-side*x*.42+Math.sin(t*Math.PI)*.017;
+        if(face.mood==='confident')y=side>0?Math.sin(t*Math.PI)*.07+.04:-x*.12;
         if(face.mood==='jailed')y=-side*x*.33+(side<0?.015:0);
         if(face.mood==='sad')y+=-side*x*.55;
         if(face.mood==='anxious')y+=-side*x*.38+(side>0?.015:0);
@@ -179,7 +184,9 @@
         }
         if(mood==='coding')this.buildCodingProps(face);
         if(mood==='headache'){this.buildHeadWrap(face);}
-        if(mood==='jailed'){this.buildJailedProps(face);}
+        if(mood==='confident'){this.buildConfidentProps(face);}
+        else if(mood==='slacking'){this.buildSlackingProps(face);}
+        else if(mood==='jailed'){this.buildJailedProps(face);}
         else if(mood==='verytired'){
           const shape=new T.Shape();shape.moveTo(-.10,-.006);shape.bezierCurveTo(-.095,.037,.065,.045,.10,.007);shape.bezierCurveTo(.105,-.023,-.065,-.018,-.10,-.006);
           face.slackMouth=this.add(face,new T.ShapeGeometry(shape,32),new T.MeshBasicMaterial({color:0x9E7D87,toneMapped:false,transparent:true}),.012,-.28,.05);
@@ -223,6 +230,54 @@
     }
     mappedFaceMesh(face,geometry,material){
       const mesh=this.deformable(geometry,material);face.group.add(mesh);return mesh;
+    }
+    buildConfidentProps(face){
+      const grin=new T.Shape();grin.moveTo(-.23,.015);grin.bezierCurveTo(-.06,-.025,.16,.025,.25,.095);grin.bezierCurveTo(.22,-.11,-.05,-.145,-.23,.015);
+      face.smile=this.add(face,new T.ShapeGeometry(grin,40),new T.MeshBasicMaterial({color:0xFFF3D8,toneMapped:false,transparent:true}),.035,-.21,.06);
+      this.curve(face,t=>{const p=grin.getPoint(t);return[p.x,p.y,0];},.035,-.21,.008,.065,64);
+      const gold=new T.MeshStandardMaterial({color:0xEFC15D,metalness:.45,roughness:.3,transparent:true});
+      face.crown=new T.Group();face.crown.position.set(-.12,.91,-.04);face.crown.rotation.z=.20;face.group.add(face.crown);
+      const crownShape=new T.Shape();crownShape.moveTo(-.28,0);crownShape.lineTo(-.33,.24);crownShape.lineTo(-.13,.14);crownShape.lineTo(0,.35);crownShape.lineTo(.13,.14);crownShape.lineTo(.33,.24);crownShape.lineTo(.28,0);crownShape.closePath();
+      const crown=new T.Mesh(new T.ExtrudeGeometry(crownShape,{depth:.11,bevelEnabled:true,bevelSize:.018,bevelThickness:.018,bevelSegments:3}),gold);face.crown.add(crown);
+      const band=new T.Mesh(new T.CapsuleGeometry(.033,.50,5,16),gold);band.rotation.z=Math.PI/2;band.position.set(0,.03,.065);face.crown.add(band);
+      const gem=new T.Mesh(new T.OctahedronGeometry(.055),new T.MeshStandardMaterial({color:0xD76D61,metalness:.1,roughness:.25,transparent:true}));gem.position.set(0,.12,.14);gem.scale.set(1,1.2,.45);face.crown.add(gem);
+      face.sparkles=[];
+      for(const [x,y,size] of [[.99,.46,.105],[-.98,.08,.065]]){
+        const starShape=new T.Shape();starShape.moveTo(0,size);starShape.quadraticCurveTo(size*.2,size*.2,size,0);starShape.quadraticCurveTo(size*.2,-size*.2,0,-size);starShape.quadraticCurveTo(-size*.2,-size*.2,-size,0);starShape.quadraticCurveTo(-size*.2,size*.2,0,size);
+        const star=new T.Mesh(new T.ExtrudeGeometry(starShape,{depth:.018,bevelEnabled:true,bevelSize:.004,bevelThickness:.004,bevelSegments:2}),gold);star.position.set(x,y,.55);face.group.add(star);face.sparkles.push(star);
+      }
+    }
+    buildSlackingProps(face){
+      const smile=new T.CurvePath();
+      smile.add(new T.CubicBezierCurve3(new T.Vector3(-.39,.035,0),new T.Vector3(-.22,-.10,0),new T.Vector3(.18,-.12,0),new T.Vector3(.34,.005,0)));
+      smile.add(new T.QuadraticBezierCurve3(new T.Vector3(.34,.005,0),new T.Vector3(.40,.055,0),new T.Vector3(.34,.10,0)));
+      face.mouth=this.curve(face,t=>{const p=smile.getPoint(t);return[p.x,p.y,p.z];},0,-.13,.011,.055,64);
+      face.mouth.mesh.material=new T.MeshBasicMaterial({color:0x627A3D,toneMapped:false,transparent:true});
+      const blue=new T.MeshStandardMaterial({color:0x82C5DE,roughness:.5,transparent:true});
+      const pale=new T.MeshStandardMaterial({color:0xD6EEF2,roughness:.65,transparent:true});
+      const fin=new T.MeshStandardMaterial({color:0x519CB8,roughness:.55,transparent:true});
+      const ink=new T.MeshBasicMaterial({color:0x356B7D,toneMapped:false,transparent:true});
+      const handMaterial=new T.MeshStandardMaterial({color:0xB2C878,roughness:.48,transparent:true});
+      face.fish=new T.Group();face.fish.position.set(0,-.65,1.48);face.group.add(face.fish);
+      const body=new T.Mesh(new T.SphereGeometry(1,40,24),blue);body.scale.set(.56,.19,.16);face.fish.add(body);
+      const belly=new T.Mesh(new T.SphereGeometry(1,32,20),pale);belly.scale.set(.47,.095,.12);belly.position.set(.025,-.07,.065);face.fish.add(belly);
+      face.fishTail=new T.Group();face.fishTail.position.set(-.47,0,0);face.fish.add(face.fishTail);
+      const tailShape=new T.Shape();tailShape.moveTo(.03,0);tailShape.quadraticCurveTo(-.09,.09,-.27,.16);tailShape.quadraticCurveTo(-.24,0,-.27,-.16);tailShape.quadraticCurveTo(-.09,-.09,.03,0);
+      const tail=new T.Mesh(new T.ExtrudeGeometry(tailShape,{depth:.045,bevelEnabled:true,bevelSize:.018,bevelThickness:.018,bevelSegments:3,curveSegments:20}),fin);tail.position.z=-.022;face.fishTail.add(tail);
+      const dorsalShape=new T.Shape();dorsalShape.moveTo(-.20,.13);dorsalShape.quadraticCurveTo(-.12,.29,.08,.23);dorsalShape.lineTo(.21,.13);dorsalShape.closePath();
+      const dorsal=new T.Mesh(new T.ExtrudeGeometry(dorsalShape,{depth:.025,bevelEnabled:true,bevelSize:.01,bevelThickness:.01,bevelSegments:2}),fin);dorsal.position.z=-.012;face.fish.add(dorsal);
+      const eyeWhite=new T.Mesh(new T.SphereGeometry(.058,20,14),this.studyWhite);eyeWhite.position.set(.36,.055,.137);eyeWhite.scale.z=.35;face.fish.add(eyeWhite);
+      const eye=new T.Mesh(new T.SphereGeometry(.029,18,12),ink);eye.position.set(.374,.055,.159);eye.scale.z=.4;face.fish.add(eye);
+      const gillPath=new T.QuadraticBezierCurve3(new T.Vector3(.20,.07,.151),new T.Vector3(.13,-.005,.169),new T.Vector3(.20,-.075,.151));
+      face.fish.add(new T.Mesh(new T.TubeGeometry(gillPath,20,.006,6,false),ink));
+      const mouthPath=new T.QuadraticBezierCurve3(new T.Vector3(.512,-.008,.06),new T.Vector3(.55,-.022,.07),new T.Vector3(.526,-.04,.06));
+      face.fish.add(new T.Mesh(new T.TubeGeometry(mouthPath,16,.007,6,false),ink));
+      face.hands=[];
+      for(const side of [-1,1]){
+        const hand=new T.Group();hand.position.set(side*.28,-.47,1.57);face.group.add(hand);face.hands.push(hand);
+        const palm=new T.Mesh(new T.SphereGeometry(1,24,16),handMaterial);palm.scale.set(.14,.095,.085);hand.add(palm);
+        const thumb=new T.Mesh(new T.SphereGeometry(1,18,12),handMaterial);thumb.scale.set(.055,.06,.05);thumb.position.set(-side*.08,-.04,.045);hand.add(thumb);
+      }
     }
     buildJailedProps(face){
       const steel=new T.MeshStandardMaterial({color:0x3D3D45,roughness:.46,metalness:.25,transparent:true});
@@ -332,6 +387,18 @@
         const moving=!this.reduced.matches&&!this.body.hold;
         face.hands.forEach((hand,i)=>hand.position.y=-.665+(moving?Math.sin(this.clock*9+i*Math.PI)*.018:0));
         face.keys.forEach((key,i)=>key.position.y=.05-(moving&&i===Math.floor(this.clock*6)%face.keys.length?.012:0));
+      }
+      if(face.sparkles){
+        const moving=!this.reduced.matches&&!this.body.hold;
+        face.sparkles.forEach((star,i)=>star.scale.setScalar(moving?1+Math.sin(this.clock*2+i*Math.PI)*.10:1));
+      }
+      if(face.fish){
+        const moving=!this.reduced.matches&&!this.body.hold;
+        const stroke=moving?Math.sin(this.clock*2.4):0;
+        face.hands[1].position.x=.28+stroke*.065;
+        face.hands[1].position.y=-.47+(moving?(1-Math.cos(this.clock*2.4))*.012:0);
+        face.hands[1].rotation.z=stroke*.10;
+        face.fishTail.rotation.y=moving?Math.sin(this.clock*3.2)*.18:0;
       }
       for(const eye of face.eyes){
         const restingRatio=this.mood==='sick'&&eye.u>0?.82:this.mood==='headache'&&eye.u<0?.80:1;

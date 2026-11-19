@@ -13,7 +13,7 @@ class BaseFixture {
 context.MoodPet=BaseFixture;
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/expressions.js'),'utf8'),context);
 const {profiles,acting}=context.window.MoodExpressions,pet=new context.window.MoodPet();
-assert.equal(Object.keys(pet.studyFaces).length,12);
+assert.equal(Object.keys(pet.studyFaces).length,14);
 for(const mood of ['happy','angry','overwhelmed']){
   pet.mood=mood;pet.attachFeatures();assert.equal(pet.studyState.active,false);
   assert(pet.features.every(f=>f.visible));assert(Object.values(pet.studyFaces).every(f=>f.group.visible===false),'Three.js only skips visible === false; undefined renders every face');
@@ -72,7 +72,7 @@ for(const mood of Object.keys(profiles)){
 }
 const html=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
 assert(html.indexOf('pet.js')<html.indexOf('expressions.js')&&html.indexOf('expressions.js')<html.indexOf('app.js'),'new face class loads before the app creates its pet');
-console.log('PASS: 12 3D faces, 3 protected faces, squeeze/stretch geometry, closed/reopened lids, skin/injury override, black circles, reduced motion, pointer direction and load order');
+console.log('PASS: 14 3D faces, 3 protected faces, squeeze/stretch geometry, closed/reopened lids, skin/injury override, black circles, reduced motion, pointer direction and load order');
 
 assert(pet.studyFaces.headache.wraps.length===2);assert(pet.studyFaces.sick.thermometer);
 assert(pet.studyFaces.coding.keyboard.position.z>1.5,'keyboard leaves a visible gap in front of the body');
@@ -86,3 +86,30 @@ assert(Math.abs(jailed.grin.u)<.02,'mouth remains centered');
 for(const eye of jailed.eyes)for(const bar of jailed.bars)assert(Math.abs(bar.position.x-eye.u)-eye.w-bar.geometry.parameters.radius>.035,'bars leave visible eye gaps');
 pet.mood='jailed';pet.clock=1;pet.attachFeatures();
 assert(jailed.hands.every(h=>h.position.y===-.40),'jailed hands stay on bars instead of running the coding animation');
+
+const slacking=pet.studyFaces.slacking;
+assert(slacking&&slacking.fish&&slacking.fishTail,'slacking has a real fish and tail');
+assert.equal(slacking.hands.length,2);
+pet.mood='slacking';pet.clock=1;pet.reduced={matches:false};pet.attachFeatures();
+const firstStroke=slacking.hands[1].position.clone(),firstTail=slacking.fishTail.rotation.y;
+pet.clock=1.6;pet.attachFeatures();
+assert(slacking.hands[1].position.distanceTo(firstStroke)>.01,'petting hand strokes over time');
+assert(Math.abs(slacking.fishTail.rotation.y-firstTail)>.01,'fish tail gently moves');
+pet.reduced={matches:true};pet.attachFeatures();const stillHand=slacking.hands[1].position.clone(),stillTail=slacking.fishTail.rotation.y;
+pet.clock=12;pet.attachFeatures();assert.equal(slacking.hands[1].position.distanceTo(stillHand),0);assert.equal(slacking.fishTail.rotation.y,stillTail);
+pet.reduced={matches:false};pet.body.grab(pet.body.x,pet.body.y);pet.attachFeatures();const heldHand=slacking.hands[1].position.clone();pet.clock=14;pet.attachFeatures();assert.equal(slacking.hands[1].position.distanceTo(heldHand),0,'holding body stops petting');pet.body.release();
+slacking.group.traverse(o=>{if(o.geometry)assert(Array.from(o.geometry.attributes.position.array).every(Number.isFinite));});
+
+assert(slacking.mouth,'slacking owns the broad asymmetric smile');
+const smileStart=slacking.mouth.point(0),smileEnd=slacking.mouth.point(1),smileCenter=slacking.mouth.point(.5);
+assert(smileEnd[0]-smileStart[0]>.70,'smile spans most of the space below both eyes');
+assert(smileEnd[1]-smileStart[1]>.05,'right smile corner curls upward');
+assert(smileCenter[1]<smileStart[1]-.08,'smile has a rounded lower sweep');
+
+const confident=pet.studyFaces.confident;
+assert(confident&&confident.crown&&confident.sparkles.length===2,'confidence has a tilted crown and two sparkles');
+pet.mood='confident';pet.clock=1;pet.reduced={matches:false};pet.attachFeatures();
+assert(confident.eyes[0].v!==confident.eyes[1].v,'confident eyes have asymmetric placement');
+assert(confident.smile.mesh.geometry.type==='ShapeGeometry','confidence has a shaped ivory grin');
+const glow=confident.sparkles[0].scale.x;pet.clock=1.7;pet.attachFeatures();assert(Math.abs(glow-confident.sparkles[0].scale.x)>.005);
+pet.reduced={matches:true};pet.attachFeatures();const stillSpark=confident.sparkles[0].scale.x;pet.clock=8;pet.attachFeatures();assert.equal(confident.sparkles[0].scale.x,stillSpark);

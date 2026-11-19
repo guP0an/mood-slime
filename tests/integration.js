@@ -15,7 +15,7 @@ app.pet.draw();gl.readPixels(Math.floor(initialCanvas.width/2),Math.floor(initia
 check(pixel[3]>0,'3D pet is painted before any interaction');
 check(app.pet.mesh.geometry.attributes.position.count>2000&&app.pet.material.isMeshPhysicalMaterial,'real 3D mesh and physically lit material');
 check(document.getElementById('record').getBoundingClientRect().bottom<=innerHeight,'record action is visible without scrolling');
-check(document.querySelectorAll('.mood-option').length===15,'fifteen selectable moods include health and fatigue levels');
+check(document.querySelectorAll('.mood-option').length===17,'seventeen selectable moods include health and fatigue levels');
 check(Object.keys(app.snapshot().summaries).length>0,'missed midnights archived at launch');
 document.querySelector('.local-label').textContent='合成数据 · 集成自检';
 const before=app.snapshot().events.length;
@@ -139,7 +139,7 @@ check(app.pet.body.settled,'body recovers after stretching before desktop rest s
 const menu=await native('testMenuInfo');
 const flatten=items=>items.flatMap(i=>[i,...flatten(i.children||[])]);
 const menuItems=flatten(menu.items);
-check(menuItems.filter(i=>i.command?.startsWith('mood:')).length===15,'native context menu exposes all fifteen moods');
+check(menuItems.filter(i=>i.command?.startsWith('mood:')).length===17,'native context menu exposes all seventeen moods');
 check(['follow','stroke','squish','move','skin','resetSkin','export','storage','calendar','hide','quit'].every(command=>menuItems.some(i=>i.command===command)),'native context menu exposes follow, interaction, settings and calendar actions');
 check(!menu.following,'cursor following is opt-in by default');
 check((await native('testMenuCommand',{command:'follow'})).ok,'native follow menu toggles on');
@@ -158,9 +158,13 @@ await wait(120);
 const recovered=await native('testMenuInfo');
 check(Math.abs(recovered.scale-.5)<.01&&Math.abs(recovered.width-170)<2&&recovered.onScreen&&!recovered.following&&!recovered.moving,'recovery keeps the requested small default visible and pauses following');
 const countBeforeRolling=app.snapshot().events.length;
+await showWindow();
+const rollFrame=app.pet.renderer.info.render.frame;
 check((await native('testRollingMove')).ok,'Option-down and dragged handlers move the native window before mouse-up');
-await wait(130);
-check(app.pet.reduced.matches||Math.abs(app.pet.rolling.angle)>.04,'moving native window visibly rotates the whole character');
+// Native window movement queues a WebKit call; wait for the rendered result, not a fixed delay.
+const rollDeadline=performance.now()+1200;
+while(!app.pet.reduced.matches&&Math.abs(app.pet.rolling.angle)<=.04&&performance.now()<rollDeadline)await wait(30);
+check(app.pet.reduced.matches||Math.abs(app.pet.rolling.angle)>.04,'moving native window visibly rotates the whole character: '+JSON.stringify({angle:app.pet.rolling.angle,frames:app.pet.renderer.info.render.frame-rollFrame,hidden:document.hidden,held:!!app.pet.body.hold,native:await native('testMenuInfo')}));
 check((await native('testMenuInfo')).dragging,'character renders rotation while native drag is still held');
 check((await native('testSnapshot',{name:'rolling.png'})).ok,'actual rolling character screenshot');
 check((await native('testRollingEnd')).ok,'mouse-up releases native drag state');
@@ -298,6 +302,12 @@ for(const mood of MoodModel.moods){
     check(ropeEnd.distanceTo(end)<.001&&app.pet.group.position.y>.2&&app.pet.shadow.material.opacity<1,'rope stays attached to the raised ball and the ground shadow softens');
   }
   if(mood.id==='headache')check(newFace.wraps.length===2&&newFace.wraps.every(m=>m.visible),'headache wears two overlapping white head wraps');
+  if(mood.id==='confident')check(newFace.crown.visible&&newFace.sparkles.length===2&&newFace.eyes[0].v!==newFace.eyes[1].v&&newFace.smile.mesh.visible,'confidence wears a tilted crown, asymmetric eyes, ivory grin and two stars');
+  if(mood.id==='slacking'){
+    check(newFace.fish.visible&&newFace.hands.length===2&&app.pet.color.getHexString()==='a6bd64','slacking has a blue 3D fish, two hands and yellow green body');
+    const clock=app.pet.clock,reduced=app.pet.reduced;app.pet.reduced={matches:false};app.pet.clock=1;app.pet.draw();const hand=newFace.hands[1].position.clone();app.pet.clock=1.6;app.pet.draw();check(hand.distanceTo(newFace.hands[1].position)>.01,'slacking hand really strokes fish in native renderer');
+    app.pet.reduced={matches:true};app.pet.draw();const restingHand=newFace.hands[1].position.clone(),tail=newFace.fishTail.rotation.y;app.pet.clock=10;app.pet.draw();check(restingHand.distanceTo(newFace.hands[1].position)===0&&tail===newFace.fishTail.rotation.y,'reduced motion freezes fish and hand');app.pet.reduced=reduced;app.pet.clock=clock;app.pet.draw();
+  }
   if(mood.id==='jailed')check(newFace.bars.length===5&&newFace.hands.length===2&&newFace.hands.every(h=>h.position.y===-.40)&&newFace.grin.mesh.geometry.type==='TubeGeometry'&&app.pet.color.getHexString()==='8e96bc','jailed has five bars, two fixed hands, closed mouth and selected blue purple');
   if(mood.id==='coding')check(newFace.headband.visible&&newFace.keyboard.visible&&newFace.keys.length===27&&newFace.hands.length===2&&newFace.parts.filter(p=>p.mesh.material===app.pet.studyGlass).length===5,'immersive coding has black glasses, headphones, a 3D keyboard and two typing hands');
   if(mood.id==='sick')check(newFace.thermometer.mesh.visible&&newFace.sickMouth.mesh.visible&&newFace.heat.length===2,'sick has a 3D thermometer, slack mouth and heat wisps');
@@ -317,7 +327,7 @@ for(const mood of MoodModel.moods){
     app.pet.group.rotation.y=savedYaw;app.pet.draw();
   }
 }
-check(eyeKinds.size===15,'all fifteen states have distinct eye acting');
+check(eyeKinds.size===17,'all seventeen states have distinct eye acting');
 app.pet.setMood('overwhelmed');app.pet.draw();
 const ropePosition=app.pet.group.position.clone(),ropeClock=app.pet.clock,ropeReduced=app.pet.reduced;
 app.pet.clock+=1;app.pet.draw();
@@ -335,17 +345,19 @@ const gazeSamples=[];
 for(let i=0;i<20;i++){await wait(260);gazeSamples.push([app.pet.studyFaces.anxious.eyes[0].dx,app.pet.studyFaces.anxious.eyes[0].dy]);if(i<6){const frame=await native('testSnapshot',{name:'gaze-'+i+'.png'});check(frame.ok&&!frame.skipped,'actual animated gaze frame '+i);}}
 check(app.pet.reduced.matches||Math.max(...gazeSamples.map(p=>p[0]))-Math.min(...gazeSamples.map(p=>p[0]))>.10,'anxious pupils scan horizontally over a full rendered cycle: '+JSON.stringify(gazeSamples));
 check(app.pet.reduced.matches||Math.max(...gazeSamples.map(p=>p[1]))-Math.min(...gazeSamples.map(p=>p[1]))>.06,'anxious pupils scan vertically over a full rendered cycle: '+JSON.stringify(gazeSamples));
+await showWindow();
 app.pet.lookAtDesktop(1,0);
 const rightGazeDeadline=performance.now()+1200;
 while(!app.pet.reduced.matches&&!app.pet.studyFaces.anxious.eyes.every(e=>e.dx>0)&&performance.now()<rightGazeDeadline)await wait(40);
 check(app.pet.reduced.matches||app.pet.studyFaces.anxious.eyes.every(e=>e.dx>0),'anxious eyes attend to a pointer on the right: '+JSON.stringify({gaze:app.pet.eyeGaze.toArray(),target:app.pet.lookTarget.toArray(),clock:app.pet.clock,attentionUntil:app.pet.attentionUntil,held:!!app.pet.body.hold,hidden:document.hidden,pupils:app.pet.studyFaces.anxious.eyes.map(e=>e.dx)}));
+await showWindow();
 app.pet.lookAtDesktop(-1,0);
 const leftGazeDeadline=performance.now()+1200;
 while(!app.pet.reduced.matches&&!app.pet.studyFaces.anxious.eyes.every(e=>e.dx<0)&&performance.now()<leftGazeDeadline)await wait(40);
-check(app.pet.reduced.matches||app.pet.studyFaces.anxious.eyes.every(e=>e.dx<0),'anxious eyes follow a pointer back to the left');
+check(app.pet.reduced.matches||app.pet.studyFaces.anxious.eyes.every(e=>e.dx<0),'anxious eyes follow a pointer back to the left: '+JSON.stringify({target:app.pet.lookTarget.toArray(),clock:app.pet.clock,attentionUntil:app.pet.attentionUntil,held:!!app.pet.body.hold,hidden:document.hidden,pupils:app.pet.studyFaces.anxious.eyes.map(e=>e.dx)}));
 app.pet.lookTarget.set(0,0);app.pet.attentionUntil=0;
 
-for(const [mood,label] of [['resigned','无奈'],['speechless','无语'],['overwhelmed','要死了'],['sleepy','好困'],['tired','轻微疲惫'],['verytired','非常疲惫'],['headache','头痛'],['sick','生病'],['coding','沉浸开发'],['jailed','坐牢']]){
+for(const [mood,label] of [['resigned','无奈'],['speechless','无语'],['overwhelmed','要死了'],['sleepy','好困'],['tired','轻微疲惫'],['verytired','非常疲惫'],['headache','头痛'],['sick','生病'],['coding','沉浸开发'],['jailed','坐牢'],['slacking','摸摸鱼'],['confident','当红炸子鸡']]){
   const count=app.snapshot().events.length;
   check((await native('testMenuCommand',{command:'mood:'+mood})).ok,'native menu saves new mood '+mood);
   check(app.snapshot().events.length===count+1&&app.snapshot().events.at(-1).mood===mood,'new mood survives native persistence '+mood);
