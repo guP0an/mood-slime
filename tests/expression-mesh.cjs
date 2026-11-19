@@ -13,7 +13,7 @@ class BaseFixture {
 context.MoodPet=BaseFixture;
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/expressions.js'),'utf8'),context);
 const {profiles,acting}=context.window.MoodExpressions,pet=new context.window.MoodPet();
-assert.equal(Object.keys(pet.studyFaces).length,11);
+assert.equal(Object.keys(pet.studyFaces).length,12);
 for(const mood of ['happy','angry','overwhelmed']){
   pet.mood=mood;pet.attachFeatures();assert.equal(pet.studyState.active,false);
   assert(pet.features.every(f=>f.visible));assert(Object.values(pet.studyFaces).every(f=>f.group.visible===false),'Three.js only skips visible === false; undefined renders every face');
@@ -72,8 +72,17 @@ for(const mood of Object.keys(profiles)){
 }
 const html=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
 assert(html.indexOf('pet.js')<html.indexOf('expressions.js')&&html.indexOf('expressions.js')<html.indexOf('app.js'),'new face class loads before the app creates its pet');
-console.log('PASS: 11 3D faces, 3 protected faces, squeeze/stretch geometry, closed/reopened lids, skin/injury override, black circles, reduced motion, pointer direction and load order');
+console.log('PASS: 12 3D faces, 3 protected faces, squeeze/stretch geometry, closed/reopened lids, skin/injury override, black circles, reduced motion, pointer direction and load order');
 
 assert(pet.studyFaces.headache.wraps.length===2);assert(pet.studyFaces.sick.thermometer);
 assert(pet.studyFaces.coding.keyboard.position.z>1.5,'keyboard leaves a visible gap in front of the body');
 assert(pet.studyFaces.coding.hands.every(h=>h.position.z>1.5),'typing hands follow the moved keyboard');
+
+const jailed=pet.studyFaces.jailed;
+assert(jailed,'jailed state has its own face');
+assert.equal(jailed.bars.length,5);assert.equal(jailed.hands.length,2);
+assert.equal(jailed.grin.mesh.geometry.type,'TubeGeometry','jailed mouth is closed without teeth');
+assert(Math.abs(jailed.grin.u)<.02,'mouth remains centered');
+for(const eye of jailed.eyes)for(const bar of jailed.bars)assert(Math.abs(bar.position.x-eye.u)-eye.w-bar.geometry.parameters.radius>.035,'bars leave visible eye gaps');
+pet.mood='jailed';pet.clock=1;pet.attachFeatures();
+assert(jailed.hands.every(h=>h.position.y===-.40),'jailed hands stay on bars instead of running the coding animation');

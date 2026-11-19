@@ -360,7 +360,7 @@
     setMood(mood) {
       if(this.mood!==mood)this.moodChangedAt=this.clock;
       this.mood=mood;
-      const colors={calm:'#79B994',happy:'#FFDA70',sad:'#79A9D2',anxious:'#A68ACB',angry:'#D97E69',tired:'#9B8DB2',resigned:'#BEA16F',speechless:'#79AFB8',overwhelmed:'#9D96AA',sleepy:'#7892AC',verytired:'#9B8DB2',headache:'#C48F9A',sick:'#DDB898',coding:'#6F9FAA'};
+      const colors={calm:'#79B994',happy:'#FFDA70',sad:'#79A9D2',anxious:'#A68ACB',angry:'#D97E69',tired:'#9B8DB2',resigned:'#BEA16F',speechless:'#79AFB8',overwhelmed:'#9D96AA',sleepy:'#7892AC',verytired:'#9B8DB2',headache:'#C48F9A',sick:'#DDB898',coding:'#6F9FAA',jailed:'#8E96BC'};
       this.color.set(colors[mood]||colors.calm);
       window.webkit?.messageHandlers?.mood?.postMessage({id:0,action:'petTint',color:colors[mood]||colors.calm});
       if(this.material)this.material.color.copy(this.color);

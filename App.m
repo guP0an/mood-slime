@@ -281,7 +281,7 @@
     NSMenuItem *moods=[[NSMenuItem alloc] initWithTitle:@"换个心情并记录" action:nil keyEquivalent:@""];
     NSMenu *choices=[NSMenu new];choices.autoenablesItems=NO;
     NSDictionary *state=self.store.state;NSString *current=[state[@"events"] lastObject][@"mood"];
-    for(NSArray *entry in @[@[@"平静",@"calm"],@[@"开心",@"happy"],@[@"难过",@"sad"],@[@"焦虑",@"anxious"],@[@"烦躁",@"angry"],@[@"轻微疲惫",@"tired"],@[@"无奈",@"resigned"],@[@"无语",@"speechless"],@[@"要死了",@"overwhelmed"],@[@"好困",@"sleepy"],@[@"非常疲惫",@"verytired"],@[@"头痛",@"headache"],@[@"生病",@"sick"],@[@"沉浸开发",@"coding"]]){
+    for(NSArray *entry in @[@[@"平静",@"calm"],@[@"开心",@"happy"],@[@"难过",@"sad"],@[@"焦虑",@"anxious"],@[@"烦躁",@"angry"],@[@"轻微疲惫",@"tired"],@[@"无奈",@"resigned"],@[@"无语",@"speechless"],@[@"要死了",@"overwhelmed"],@[@"好困",@"sleepy"],@[@"非常疲惫",@"verytired"],@[@"头痛",@"headache"],@[@"生病",@"sick"],@[@"沉浸开发",@"coding"],@[@"坐牢",@"jailed"]]){
         NSMenuItem *item=[self menuItem:entry[0] command:[@"mood:" stringByAppendingString:entry[1]]];
         item.state=[entry[1] isEqual:current]?NSControlStateValueOn:NSControlStateValueOff;
         item.enabled=!self.store.readOnly&&self.pendingIO==0;[choices addItem:item];
@@ -625,7 +625,7 @@
         BOOL ok=png&&[png writeToURL:[self.artifacts URLByAppendingPathComponent:name] options:NSDataWritingAtomic error:NULL];
         [self reply:identifier value:@{@"ok":@(ok)}];return;
     }
-    if(!self.artifacts||![@[@"calendar.png",@"squashed.png",@"stretch.png",@"desktop.png",@"rolling.png",@"happy-bandaged.png",@"time-axis.png",@"skin.png",@"mood-calm.png",@"mood-happy.png",@"mood-sad.png",@"mood-angry.png",@"mood-anxious.png",@"mood-tired.png",@"mood-resigned.png",@"mood-speechless.png",@"mood-overwhelmed.png",@"mood-sleepy.png",@"mood-verytired.png",@"mood-headache.png",@"mood-sick.png",@"mood-coding.png",@"gaze-0.png",@"gaze-1.png",@"gaze-2.png",@"gaze-3.png",@"gaze-4.png",@"gaze-5.png"] containsObject:name]){[self reply:identifier value:@{@"ok":@YES,@"skipped":@YES}];return;}
+    if(!self.artifacts||![@[@"calendar.png",@"squashed.png",@"stretch.png",@"desktop.png",@"rolling.png",@"happy-bandaged.png",@"time-axis.png",@"skin.png",@"mood-calm.png",@"mood-happy.png",@"mood-sad.png",@"mood-angry.png",@"mood-anxious.png",@"mood-tired.png",@"mood-resigned.png",@"mood-speechless.png",@"mood-overwhelmed.png",@"mood-sleepy.png",@"mood-verytired.png",@"mood-headache.png",@"mood-sick.png",@"mood-coding.png",@"mood-jailed.png",@"gaze-0.png",@"gaze-1.png",@"gaze-2.png",@"gaze-3.png",@"gaze-4.png",@"gaze-5.png"] containsObject:name]){[self reply:identifier value:@{@"ok":@YES,@"skipped":@YES}];return;}
     [NSFileManager.defaultManager createDirectoryAtURL:self.artifacts withIntermediateDirectories:YES attributes:nil error:NULL];
     WKSnapshotConfiguration *configuration=[WKSnapshotConfiguration new];configuration.afterScreenUpdates=YES;
     [self.web takeSnapshotWithConfiguration:configuration completionHandler:^(NSImage *image,NSError *error){NSBitmapImageRep *bitmap=image?[[NSBitmapImageRep alloc] initWithData:image.TIFFRepresentation]:nil;NSData *png=[bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}];BOOL ok=png&&[png writeToURL:[self.artifacts URLByAppendingPathComponent:name] options:NSDataWritingAtomic error:NULL];[self reply:identifier value:@{@"ok":@(ok),@"error":error.localizedDescription?:@""}];}];

@@ -15,7 +15,7 @@ app.pet.draw();gl.readPixels(Math.floor(initialCanvas.width/2),Math.floor(initia
 check(pixel[3]>0,'3D pet is painted before any interaction');
 check(app.pet.mesh.geometry.attributes.position.count>2000&&app.pet.material.isMeshPhysicalMaterial,'real 3D mesh and physically lit material');
 check(document.getElementById('record').getBoundingClientRect().bottom<=innerHeight,'record action is visible without scrolling');
-check(document.querySelectorAll('.mood-option').length===14,'fourteen selectable moods include health and fatigue levels');
+check(document.querySelectorAll('.mood-option').length===15,'fifteen selectable moods include health and fatigue levels');
 check(Object.keys(app.snapshot().summaries).length>0,'missed midnights archived at launch');
 document.querySelector('.local-label').textContent='合成数据 · 集成自检';
 const before=app.snapshot().events.length;
@@ -139,7 +139,7 @@ check(app.pet.body.settled,'body recovers after stretching before desktop rest s
 const menu=await native('testMenuInfo');
 const flatten=items=>items.flatMap(i=>[i,...flatten(i.children||[])]);
 const menuItems=flatten(menu.items);
-check(menuItems.filter(i=>i.command?.startsWith('mood:')).length===14,'native context menu exposes all fourteen moods');
+check(menuItems.filter(i=>i.command?.startsWith('mood:')).length===15,'native context menu exposes all fifteen moods');
 check(['follow','stroke','squish','move','skin','resetSkin','export','storage','calendar','hide','quit'].every(command=>menuItems.some(i=>i.command===command)),'native context menu exposes follow, interaction, settings and calendar actions');
 check(!menu.following,'cursor following is opt-in by default');
 check((await native('testMenuCommand',{command:'follow'})).ok,'native follow menu toggles on');
@@ -298,6 +298,7 @@ for(const mood of MoodModel.moods){
     check(ropeEnd.distanceTo(end)<.001&&app.pet.group.position.y>.2&&app.pet.shadow.material.opacity<1,'rope stays attached to the raised ball and the ground shadow softens');
   }
   if(mood.id==='headache')check(newFace.wraps.length===2&&newFace.wraps.every(m=>m.visible),'headache wears two overlapping white head wraps');
+  if(mood.id==='jailed')check(newFace.bars.length===5&&newFace.hands.length===2&&newFace.hands.every(h=>h.position.y===-.40)&&newFace.grin.mesh.geometry.type==='TubeGeometry'&&app.pet.color.getHexString()==='8e96bc','jailed has five bars, two fixed hands, closed mouth and selected blue purple');
   if(mood.id==='coding')check(newFace.headband.visible&&newFace.keyboard.visible&&newFace.keys.length===27&&newFace.hands.length===2&&newFace.parts.filter(p=>p.mesh.material===app.pet.studyGlass).length===5,'immersive coding has black glasses, headphones, a 3D keyboard and two typing hands');
   if(mood.id==='sick')check(newFace.thermometer.mesh.visible&&newFace.sickMouth.mesh.visible&&newFace.heat.length===2,'sick has a 3D thermometer, slack mouth and heat wisps');
   if(mood.id==='verytired')check(newFace.slackMouth.mesh.visible&&newFace.eyes[0].v<newFace.eyes[1].v&&newFace.eyes.every(e=>!e.glint.mesh.visible)&&app.pet.body.restHeight<.85,'very tired has asymmetric sagging eyes, slack mouth and a lower rest pose');
@@ -316,7 +317,7 @@ for(const mood of MoodModel.moods){
     app.pet.group.rotation.y=savedYaw;app.pet.draw();
   }
 }
-check(eyeKinds.size===14,'all fourteen states have distinct eye acting');
+check(eyeKinds.size===15,'all fifteen states have distinct eye acting');
 app.pet.setMood('overwhelmed');app.pet.draw();
 const ropePosition=app.pet.group.position.clone(),ropeClock=app.pet.clock,ropeReduced=app.pet.reduced;
 app.pet.clock+=1;app.pet.draw();
@@ -344,7 +345,7 @@ while(!app.pet.reduced.matches&&!app.pet.studyFaces.anxious.eyes.every(e=>e.dx<0
 check(app.pet.reduced.matches||app.pet.studyFaces.anxious.eyes.every(e=>e.dx<0),'anxious eyes follow a pointer back to the left');
 app.pet.lookTarget.set(0,0);app.pet.attentionUntil=0;
 
-for(const [mood,label] of [['resigned','无奈'],['speechless','无语'],['overwhelmed','要死了'],['sleepy','好困'],['tired','轻微疲惫'],['verytired','非常疲惫'],['headache','头痛'],['sick','生病'],['coding','沉浸开发']]){
+for(const [mood,label] of [['resigned','无奈'],['speechless','无语'],['overwhelmed','要死了'],['sleepy','好困'],['tired','轻微疲惫'],['verytired','非常疲惫'],['headache','头痛'],['sick','生病'],['coding','沉浸开发'],['jailed','坐牢']]){
   const count=app.snapshot().events.length;
   check((await native('testMenuCommand',{command:'mood:'+mood})).ok,'native menu saves new mood '+mood);
   check(app.snapshot().events.length===count+1&&app.snapshot().events.at(-1).mood===mood,'new mood survives native persistence '+mood);

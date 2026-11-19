@@ -2,6 +2,7 @@
   'use strict';
   const T=window.THREE,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const profiles={
+    jailed:{w:.18,h:.21,iris:[.09,.125],open:.64,gaze:[0,-.025]},
     coding:{w:.175,h:.18,iris:[.105,.13],open:.88,gaze:[.01,-.035]},
     headache:{w:.235,h:.23,iris:[.11,.14],open:.58,gaze:[-.015,-.035]},
     verytired:{w:.29,h:.23,iris:[.145,.16],open:.34,gaze:[.075,-.065]},
@@ -94,6 +95,7 @@
       if(face.mood==='sick')eye.v+=side>0?-.026:.015;
       if(face.mood==='verytired')eye.v+=side<0?-.065:.035;
       if(face.mood==='headache')eye.v+=side>0?-.025:.01;
+      if(face.mood==='jailed'){eye.u=side*.27;eye.v=side>0?.13:.16;}
       if(face.mood==='resigned')eye.v+=side*.018;
       if(face.mood==='anxious')eye.v+=side<0?.02:-.02;
       eye.uniform={value:new T.Vector3(eye.w,eye.h,2*eye.open-1)};
@@ -151,6 +153,7 @@
         let y=arch;
         if(face.mood==='sick')y=-side*x*.32+Math.sin(t*Math.PI*2)*.009;
         if(face.mood==='headache')y=-side*x*.42+Math.sin(t*Math.PI)*.017;
+        if(face.mood==='jailed')y=-side*x*.33+(side<0?.015:0);
         if(face.mood==='sad')y+=-side*x*.55;
         if(face.mood==='anxious')y+=-side*x*.38+(side>0?.015:0);
         if(['tired','verytired'].includes(face.mood))y+=-side*x*.26-.025;
@@ -176,7 +179,8 @@
         }
         if(mood==='coding')this.buildCodingProps(face);
         if(mood==='headache'){this.buildHeadWrap(face);}
-        if(mood==='verytired'){
+        if(mood==='jailed'){this.buildJailedProps(face);}
+        else if(mood==='verytired'){
           const shape=new T.Shape();shape.moveTo(-.10,-.006);shape.bezierCurveTo(-.095,.037,.065,.045,.10,.007);shape.bezierCurveTo(.105,-.023,-.065,-.018,-.10,-.006);
           face.slackMouth=this.add(face,new T.ShapeGeometry(shape,32),new T.MeshBasicMaterial({color:0x9E7D87,toneMapped:false,transparent:true}),.012,-.28,.05);
           this.curve(face,t=>{const p=shape.getPoint(t);return[p.x,p.y,0];},.012,-.28,.004,.056,48);
@@ -219,6 +223,32 @@
     }
     mappedFaceMesh(face,geometry,material){
       const mesh=this.deformable(geometry,material);face.group.add(mesh);return mesh;
+    }
+    buildJailedProps(face){
+      const steel=new T.MeshStandardMaterial({color:0x3D3D45,roughness:.46,metalness:.25,transparent:true});
+      face.bars=[];
+      for(const x of [-1.04,-.54,0,.54,1.04]){
+        const bar=new T.Mesh(new T.CapsuleGeometry(.022,2.04,6,12),steel);bar.position.set(x,.16,1.24);face.group.add(bar);face.bars.push(bar);
+      }
+      face.rail=new T.Mesh(new T.BoxGeometry(2.20,.055,.075),steel);face.rail.position.set(0,-.89,1.24);face.group.add(face.rail);
+      face.hands=[];
+      const handMat=new T.MeshStandardMaterial({color:0xA6AED0,roughness:.5,transparent:true});
+      const seamMat=new T.MeshBasicMaterial({color:0x7C84A7,toneMapped:false,transparent:true,opacity:.5});
+      for(const side of [-1,1]){
+        const hand=new T.Group();hand.position.set(side*.54,-.40,1.27);face.group.add(hand);face.hands.push(hand);
+        const mitten=new T.Mesh(new T.SphereGeometry(1,24,16),handMat);mitten.scale.set(.105,.125,.065);mitten.position.z=.025;hand.add(mitten);
+        const thumb=new T.Mesh(new T.SphereGeometry(1,18,12),handMat);thumb.scale.set(.055,.065,.045);thumb.position.set(side*.055,.045,.05);hand.add(thumb);
+        for(const y of [-.025,.025]){
+          const crease=new T.QuadraticBezierCurve3(new T.Vector3(-.035,y,.087),new T.Vector3(.015,y+.008,.09),new T.Vector3(.058,y-.002,.08));
+          hand.add(new T.Mesh(new T.TubeGeometry(crease,12,.0025,5,false),seamMat));
+        }
+      }
+      face.grin=this.curve(face,t=>[(t-.5)*.34,Math.sin(t*Math.PI)*.012-Math.sin(t*Math.PI*2)*.005,0],0,-.24,.005,.060,40);
+      const cheek=new T.ShaderMaterial({transparent:true,depthWrite:false,toneMapped:false,
+        vertexShader:'varying vec2 blushUv; void main(){blushUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+        fragmentShader:'varying vec2 blushUv; void main(){float r=length((blushUv-.5)*2.0);gl_FragColor=vec4(.77,.46,.48,exp(-r*r*4.0)*smoothstep(1.0,.5,r)*.17);}'
+      });
+      for(const side of [-1,1])this.add(face,new T.PlaneGeometry(.26,.15,12,8),cheek,side*.40,-.12,.034);
     }
     buildCodingProps(face){
       const shell=new T.MeshStandardMaterial({color:0x303844,roughness:.5,transparent:true});
@@ -298,7 +328,7 @@
       this.features.forEach(f=>f.visible=false);
       const pose=acting(this.mood,this.clock,this.clock<this.attentionUntil,this.lookTarget.x/.3,this.lookTarget.y/.15,this.reduced.matches||!!this.body.hold);
       this.studyState.pose=pose;
-      if(face.hands){
+      if(face.keys){
         const moving=!this.reduced.matches&&!this.body.hold;
         face.hands.forEach((hand,i)=>hand.position.y=-.665+(moving?Math.sin(this.clock*9+i*Math.PI)*.018:0));
         face.keys.forEach((key,i)=>key.position.y=.05-(moving&&i===Math.floor(this.clock*6)%face.keys.length?.012:0));

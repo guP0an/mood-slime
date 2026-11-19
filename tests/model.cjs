@@ -95,15 +95,15 @@ test('duration and clock labels preserve minute and subminute precision',()=>{
   assert.equal(M.clockLabel(1440),'24:00');assert.equal(M.clockLabel(602.5,true),'10:02:30');
   assert.equal(M.durationLabel(125),'2\u5c0f\u65f65\u5206\u949f');assert.equal(M.durationLabel(.5),'30\u79d2');
 });
-test('resigned and speechless round-trip with all fourteen moods, recaps and time spans',()=>{
-  assert.equal(M.moods.length,14);assert.equal(M.moodById.resigned.name,'无奈');assert.equal(M.moodById.speechless.name,'无语');
+test('resigned and speechless round-trip with all fifteen moods, recaps and time spans',()=>{
+  assert.equal(M.moods.length,15);assert.equal(M.moodById.resigned.name,'无奈');assert.equal(M.moodById.speechless.name,'无语');
   let s=M.empty();
   M.moods.forEach((m,i)=>{s=M.record(s,m.id,'synthetic '+m.id,new Date(2026,10,3,8+i),'mood-'+i);});
   s=M.closeDays(s,new Date(2026,10,4));
   assert.deepEqual(M.validate(JSON.parse(JSON.stringify(s))),s);
-  assert.equal(s.summaries['2026-11-03'].counts.length,14);
+  assert.equal(s.summaries['2026-11-03'].counts.length,15);
   const axis=M.dayTimeline(s,'2026-11-03',new Date(2026,10,4));
-  assert.equal(axis.totals.length,14);assert.equal(M.momentAt(axis,14*60+30).event.mood,'resigned');
+  assert.equal(axis.totals.length,15);assert.equal(M.momentAt(axis,14*60+30).event.mood,'resigned');
   assert.equal(M.momentAt(axis,15*60+30).event.mood,'speechless');
   assert.equal(M.moodById.overwhelmed.name,'要死了');assert.equal(M.momentAt(axis,16*60+30).event.mood,'overwhelmed');
   assert.equal(M.moodById.sleepy.name,'好困');assert.equal(M.momentAt(axis,17*60+30).event.mood,'sleepy');
@@ -112,7 +112,7 @@ test('health states preserve old fatigue records and serialize all new identifie
   const legacy=M.record(M.empty(),'tired','old',new Date(2026,10,3,10),'legacy');
   assert.equal(M.validate(JSON.parse(JSON.stringify(legacy))).events[0].mood,'tired');
   assert.equal(M.moodById.tired.name,'轻微疲惫');
-  for(const [id,name] of [['verytired','非常疲惫'],['headache','头痛'],['sick','生病'],['coding','沉浸开发']]){
+  for(const [id,name] of [['verytired','非常疲惫'],['headache','头痛'],['sick','生病'],['coding','沉浸开发'],['jailed','坐牢']]){
     assert.equal(M.moodById[id].name,name);
     const state=M.record(legacy,id,'new',new Date(2026,10,3,11),id);
     assert.equal(M.validate(JSON.parse(JSON.stringify(state))).events[1].mood,id);

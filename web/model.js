@@ -14,7 +14,8 @@
     {id:'verytired', name:'非常疲惫', color:'#A79AB6', ink:'#675A78'},
     {id:'headache', name:'头痛', color:'#C48F9A', ink:'#895564'},
     {id:'sick', name:'生病', color:'#DDB898', ink:'#8E6148'},
-    {id:'coding', name:'沉浸开发', color:'#79A5AE', ink:'#426A75'}
+    {id:'coding', name:'沉浸开发', color:'#79A5AE', ink:'#426A75'},
+    {id:'jailed', name:'坐牢', color:'#8E96BC', ink:'#5B607C'}
   ];
   const moodById = Object.fromEntries(moods.map(m=>[m.id,m]));
   function dayKey(date = new Date()) {
