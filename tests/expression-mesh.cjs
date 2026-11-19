@@ -13,13 +13,13 @@ class BaseFixture {
 context.MoodPet=BaseFixture;
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/expressions.js'),'utf8'),context);
 const {profiles,acting}=context.window.MoodExpressions,pet=new context.window.MoodPet();
-assert.equal(Object.keys(pet.studyFaces).length,14);
+assert.equal(Object.keys(pet.studyFaces).length,15);
 for(const mood of ['happy','angry','overwhelmed']){
   pet.mood=mood;pet.attachFeatures();assert.equal(pet.studyState.active,false);
   assert(pet.features.every(f=>f.visible));assert(Object.values(pet.studyFaces).every(f=>f.group.visible===false),'Three.js only skips visible === false; undefined renders every face');
 }
 for(const mood of Object.keys(profiles)){
-  pet.mood=mood;pet.body.values.fill(0);pet.body.prepare();pet.attachFeatures();
+  pet.mood=mood;pet.body.setRestPose(mood);pet.body.values.fill(0);pet.body.prepare();pet.attachFeatures();
   assert(pet.studyState.active);assert(pet.features.every(f=>!f.visible));
   assert.deepEqual(Object.values(pet.studyFaces).filter(f=>f.group.visible!==false).map(f=>f.mood),[mood]);
   const face=pet.studyFaces[mood],ids=face.parts.map(p=>p.mesh.geometry.uuid);
@@ -72,7 +72,7 @@ for(const mood of Object.keys(profiles)){
 }
 const html=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
 assert(html.indexOf('pet.js')<html.indexOf('expressions.js')&&html.indexOf('expressions.js')<html.indexOf('app.js'),'new face class loads before the app creates its pet');
-console.log('PASS: 14 3D faces, 3 protected faces, squeeze/stretch geometry, closed/reopened lids, skin/injury override, black circles, reduced motion, pointer direction and load order');
+console.log('PASS: 15 3D faces, 3 protected faces, squeeze/stretch geometry, closed/reopened lids, skin/injury override, black circles, reduced motion, pointer direction and load order');
 
 assert(pet.studyFaces.headache.wraps.length===2);assert(pet.studyFaces.sick.thermometer);
 assert(pet.studyFaces.coding.keyboard.position.z>1.5,'keyboard leaves a visible gap in front of the body');
@@ -107,13 +107,14 @@ assert(smileEnd[1]-smileStart[1]>.05,'right smile corner curls upward');
 assert(smileCenter[1]<smileStart[1]-.08,'smile has a rounded lower sweep');
 
 const confident=pet.studyFaces.confident;
-assert(confident&&confident.liftingArms?.length===2&&confident.drumsticks?.length===2&&confident.flowers.length===2,'confidence raises two chicken drumsticks like a weightlifting champion');
-assert(!confident.crown,'red champion replaces the previous crown concept');
-for(const [i,drumstick] of confident.drumsticks.entries()){const arm=confident.liftingArms[i];assert(Math.abs(arm.position.x+drumstick.position.x)>1.15,'hands are spread outside the left and right sides of the body');assert(drumstick.position.y>.35,'elbows flex upward beside the body');}
-pet.mood='confident';pet.clock=1;pet.reduced={matches:false};pet.attachFeatures();
-assert(confident.eyes[0].v!==confident.eyes[1].v,'confident eyes have asymmetric placement');
-assert(confident.smile.mesh.geometry.type==='TubeGeometry','confidence has the reference soft W mouth');
-assert(confident.blush.length===2,'confidence has two pink cheeks');
-assert(confident.eyes.every(e=>!e.white.mesh.visible&&!e.iris.mesh.visible&&e.lid.mesh.visible),'confidence uses smiling arcs instead of the earlier half-lidded look');
-const glow=confident.flowers[0].scale.x;pet.clock=1.7;pet.attachFeatures();assert(Math.abs(glow-confident.flowers[0].scale.x)>.005);
-pet.reduced={matches:true};pet.attachFeatures();const stillSpark=confident.flowers[0].scale.x;pet.clock=8;pet.attachFeatures();assert.equal(confident.flowers[0].scale.x,stillSpark);
+assert(confident&&confident.roundHands?.length===2&&confident.drumsticks.length===2&&confident.stars.length===3,'confidence has detached hands, crispy chicken and three stars');
+assert.equal(confident.glasses.length,2);assert(!confident.liftingArms&&!confident.foldedArms);
+pet.body.values=[0,0,0];pet.body.prepare();pet.body.setRestPose('confident');
+for(const hand of confident.roundHands)assert(Math.abs(hand.position.x)-hand.scale.x-pet.body.deform(1,.25,0).x>.08,'hand stays separated from body');
+assert(confident.drumsticks.every(d=>d.children.some(m=>m.isInstancedMesh&&m.count>=80)),'chicken has real crust flakes');
+pet.mood='confident';pet.clock=1;pet.reduced={matches:false};pet.attachFeatures();const glow=confident.stars[0].scale.x;pet.clock=1.7;pet.attachFeatures();assert(Math.abs(glow-confident.stars[0].scale.x)>.005);
+pet.reduced={matches:true};pet.attachFeatures();const still=confident.stars[0].scale.x;pet.clock=8;pet.attachFeatures();assert.equal(confident.stars[0].scale.x,still);
+const egg=pet.studyFaces.suffering;assert(egg&&egg.eggWhite&&egg.steam.length===2&&egg.sweat.length===2);
+pet.body.setRestPose('suffering');const top=pet.body.deform(0,1,0),rim=pet.body.deform(.7,0,0),bottom=pet.body.deform(0,-1,0);
+assert(top.y-rim.y<.01&&top.y-bottom.y<.05,'yolk is a thin flat layer');
+pet.mood='suffering';pet.attachFeatures();const steam=egg.steam[0].position.y;pet.clock=14;pet.attachFeatures();assert.equal(egg.steam[0].position.y,steam,'reduced motion freezes steam');

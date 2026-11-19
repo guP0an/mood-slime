@@ -63,7 +63,7 @@
       z *= fullness;
       y = (y < -.72 ? -.72+(y+.72)*.32 : y)*.95;
       x*=this.restWidth;z*=this.restWidth;
-      y=FLOOR+(y-FLOOR)*this.restHeight;
+      y=this.restMood==='suffering'?-.685+y*(y>=0?.008:.04):FLOOR+(y-FLOOR)*this.restHeight;
       x *= this.sx; z *= this.sx;
       y = FLOOR+(y-FLOOR)*this.sy;
       const centerY = FLOOR+(.03-FLOOR)*this.sy*this.restHeight;
@@ -76,8 +76,9 @@
       return out;
     }
     setRestPose(mood){
-      this.restHeight=({tired:.85,verytired:.67,sick:.91,headache:.96,happy:1.04,angry:1.05})[mood]||1;
-      this.restWidth=({tired:1.055,verytired:1.15,sick:1.025,headache:1.015,happy:1.025,angry:1.04})[mood]||1;
+      this.restMood=mood;
+      this.restHeight=({confident:1.045,suffering:.44,tired:.85,verytired:.67,sick:.91,headache:.96,happy:1.04,angry:1.05})[mood]||1;
+      this.restWidth=({confident:1.025,suffering:.70,tired:1.055,verytired:1.15,sick:1.025,headache:1.015,happy:1.025,angry:1.04})[mood]||1;
     }
     resize(x, y, r) { this.release(); this.x=x; this.y=y; this.r=Math.max(1,r); }
     get press() { return Math.max(0,this.squash); }

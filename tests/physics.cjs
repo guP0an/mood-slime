@@ -39,7 +39,7 @@ for(const [x,y,r] of [[NaN,0,80],[1,0,0],[Infinity,1,50],[10000,0,80]])leftRoll.
 assert(!leftRoll.moving,'invalid movement and screen teleports do not spin');
 console.log('PASS: rolling direction, rest/upright recovery, 600 interrupted moves, reset and teleport rejection');
 
-for(const mood of ['calm','happy','angry','tired','verytired','overwhelmed','headache','sick']){
+for(const mood of ['calm','happy','angry','tired','verytired','overwhelmed','headache','sick','confident','suffering']){
   s.values.fill(0);s.velocity.fill(0);s.prepare();s.setRestPose(mood);
   const base=s.deform(0,-1,0),top=s.deform(0,1,0);
   assert(top.y>base.y,'positive resting height');

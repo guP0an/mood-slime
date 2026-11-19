@@ -15,7 +15,7 @@ app.pet.draw();gl.readPixels(Math.floor(initialCanvas.width/2),Math.floor(initia
 check(pixel[3]>0,'3D pet is painted before any interaction');
 check(app.pet.mesh.geometry.attributes.position.count>2000&&app.pet.material.isMeshPhysicalMaterial,'real 3D mesh and physically lit material');
 check(document.getElementById('record').getBoundingClientRect().bottom<=innerHeight,'record action is visible without scrolling');
-check(document.querySelectorAll('.mood-option').length===17,'seventeen selectable moods include health and fatigue levels');
+check(document.querySelectorAll('.mood-option').length===18,'eighteen selectable moods include health and fatigue levels');
 check(Object.keys(app.snapshot().summaries).length>0,'missed midnights archived at launch');
 document.querySelector('.local-label').textContent='合成数据 · 集成自检';
 const before=app.snapshot().events.length;
@@ -139,7 +139,7 @@ check(app.pet.body.settled,'body recovers after stretching before desktop rest s
 const menu=await native('testMenuInfo');
 const flatten=items=>items.flatMap(i=>[i,...flatten(i.children||[])]);
 const menuItems=flatten(menu.items);
-check(menuItems.filter(i=>i.command?.startsWith('mood:')).length===17,'native context menu exposes all seventeen moods');
+check(menuItems.filter(i=>i.command?.startsWith('mood:')).length===18,'native context menu exposes all eighteen moods');
 check(['follow','stroke','squish','move','skin','resetSkin','export','storage','calendar','hide','quit'].every(command=>menuItems.some(i=>i.command===command)),'native context menu exposes follow, interaction, settings and calendar actions');
 check(!menu.following,'cursor following is opt-in by default');
 check((await native('testMenuCommand',{command:'follow'})).ok,'native follow menu toggles on');
@@ -240,7 +240,7 @@ for(const mood of MoodModel.moods){
   check(app.pet.rope.visible===(mood.id==='overwhelmed'),'suspension rope is limited to the overwhelmed native ball: '+mood.id);
   check((await native('testSnapshot',{name:'mood-'+mood.id+'.png'})).ok,'expression reference screenshot '+mood.id);
   // Sample clear body at the side; new head wraps and large vacant eyes cover the forehead.
-  const forehead=app.pet.body.deform(.74,-.26,Math.sqrt(1-.74*.74-.26*.26));
+  const forehead=mood.id==='suffering'?app.pet.body.deform(.50,.65,Math.sqrt(1-.50*.50-.65*.65)):app.pet.body.deform(.74,-.26,Math.sqrt(1-.74*.74-.26*.26));
   const sample=app.pet.mesh.localToWorld(new THREE.Vector3(forehead.x,forehead.y,forehead.z)).project(app.pet.camera),bodyPixel=new Uint8Array(4);
   gl.readPixels(Math.round((sample.x*.5+.5)*initialCanvas.width),Math.round((sample.y*.5+.5)*initialCanvas.height),1,1,gl.RGBA,gl.UNSIGNED_BYTE,bodyPixel);
   const brightest=Math.max(...bodyPixel.slice(0,3)),saturation=(brightest-Math.min(...bodyPixel.slice(0,3)))/Math.max(1,brightest);
@@ -302,7 +302,15 @@ for(const mood of MoodModel.moods){
     check(ropeEnd.distanceTo(end)<.001&&app.pet.group.position.y>.2&&app.pet.shadow.material.opacity<1,'rope stays attached to the raised ball and the ground shadow softens');
   }
   if(mood.id==='headache')check(newFace.wraps.length===2&&newFace.wraps.every(m=>m.visible),'headache wears two overlapping white head wraps');
-  if(mood.id==='confident')check(newFace.liftingArms.length===2&&newFace.drumsticks.length===2&&newFace.drumsticks.every((d,i)=>Math.abs(d.position.x+newFace.liftingArms[i].position.x)>1.15)&&!newFace.crown&&newFace.flowers.length===2&&newFace.blush.length===2&&newFace.smile.mesh.geometry.type==='TubeGeometry'&&newFace.eyes.every(e=>e.lid.mesh.visible&&!e.iris.mesh.visible)&&app.pet.color.getHexString()==='d9232e'&&bodyPixel[0]>bodyPixel[1]*1.3&&bodyPixel[0]>bodyPixel[2]*1.3,'red champion raises two drumsticks with a W smile, smiling closed eyes, pink cheeks and flowers');
+  if(mood.id==='confident'){
+    check(newFace.roundHands.length===2&&!newFace.liftingArms&&newFace.glasses.length===2&&newFace.stars.length===3&&newFace.drumsticks.every(d=>d.children.some(m=>m.isInstancedMesh&&m.count===110))&&app.pet.color.getHexString()==='c85751','confidence uses detached hands, crispy chicken, sunglasses, stars and softened red');
+    check(app.pet.camera.zoom<1&&app.pet.group.rotation.x<-.08,'confidence fits wide accessories and holds its chin up');
+  }
+  if(mood.id==='suffering'){
+    const top=app.pet.body.deform(0,1,0),rim=app.pet.body.deform(.7,0,0),bottom=app.pet.body.deform(0,-1,0);
+    check(top.y-rim.y<.01&&top.y-bottom.y<.05&&newFace.eggWhite.visible,'suffering is the approved flat fried egg without a domed yolk');
+    check(app.pet.camera.position.y>4&&app.pet.group.rotation.x===0&&app.pet.group.rotation.z===0&&app.pet.material.transmission===0,'egg remains level under an overhead camera with opaque yolk');
+  }
   if(mood.id==='slacking'){
     check(newFace.fish.visible&&newFace.hands.length===2&&app.pet.color.getHexString()==='a6bd64','slacking has a blue 3D fish, two hands and yellow green body');
     const clock=app.pet.clock,reduced=app.pet.reduced;app.pet.reduced={matches:false};app.pet.clock=1;app.pet.draw();const hand=newFace.hands[1].position.clone();app.pet.clock=1.6;app.pet.draw();check(hand.distanceTo(newFace.hands[1].position)>.01,'slacking hand really strokes fish in native renderer');
@@ -327,8 +335,9 @@ for(const mood of MoodModel.moods){
     app.pet.group.rotation.y=savedYaw;app.pet.draw();
   }
 }
-check(eyeKinds.size===17,'all seventeen states have distinct eye acting');
+check(eyeKinds.size===18,'all eighteen states have distinct eye acting');
 app.pet.setMood('overwhelmed');app.pet.draw();
+check(app.pet.camera.position.y===1.4&&app.pet.camera.zoom===1&&app.pet.material.transmission===.24,'switching from egg restores original camera and jelly material');
 const ropePosition=app.pet.group.position.clone(),ropeClock=app.pet.clock,ropeReduced=app.pet.reduced;
 app.pet.clock+=1;app.pet.draw();
 check(app.pet.reduced.matches||app.pet.group.position.distanceTo(ropePosition)>.001,'hanging ball gently moves over rendered time');
@@ -357,7 +366,7 @@ while(!app.pet.reduced.matches&&!app.pet.studyFaces.anxious.eyes.every(e=>e.dx<0
 check(app.pet.reduced.matches||app.pet.studyFaces.anxious.eyes.every(e=>e.dx<0),'anxious eyes follow a pointer back to the left: '+JSON.stringify({target:app.pet.lookTarget.toArray(),clock:app.pet.clock,attentionUntil:app.pet.attentionUntil,held:!!app.pet.body.hold,hidden:document.hidden,pupils:app.pet.studyFaces.anxious.eyes.map(e=>e.dx)}));
 app.pet.lookTarget.set(0,0);app.pet.attentionUntil=0;
 
-for(const [mood,label] of [['resigned','无奈'],['speechless','无语'],['overwhelmed','要死了'],['sleepy','好困'],['tired','轻微疲惫'],['verytired','非常疲惫'],['headache','头痛'],['sick','生病'],['coding','沉浸开发'],['jailed','坐牢'],['slacking','摸摸鱼'],['confident','当红炸子鸡']]){
+for(const [mood,label] of [['resigned','无奈'],['speechless','无语'],['overwhelmed','要死了'],['sleepy','好困'],['tired','轻微疲惫'],['verytired','非常疲惫'],['headache','头痛'],['sick','生病'],['coding','沉浸开发'],['jailed','坐牢'],['slacking','摸摸鱼'],['confident','当红炸子鸡'],['suffering','煎熬']]){
   const count=app.snapshot().events.length;
   check((await native('testMenuCommand',{command:'mood:'+mood})).ok,'native menu saves new mood '+mood);
   check(app.snapshot().events.length===count+1&&app.snapshot().events.at(-1).mood===mood,'new mood survives native persistence '+mood);

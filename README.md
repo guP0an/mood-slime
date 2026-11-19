@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <strong>macOS 13+</strong> &nbsp; / &nbsp; <strong>真实 3D</strong> &nbsp; / &nbsp; <strong>17 种心情</strong> &nbsp; / &nbsp; <strong>本机存储</strong>
+  <strong>macOS 13+</strong> &nbsp; / &nbsp; <strong>真实 3D</strong> &nbsp; / &nbsp; <strong>18 种心情</strong> &nbsp; / &nbsp; <strong>本机存储</strong>
 </p>
 
 <p align="center">
@@ -22,12 +22,13 @@
 
 开心时露出大牙，平静时扶好眼镜；困了有黑眼圈，累了连身体也会塌一点。每种心情都有自己的五官、颜色和神态。
 
-下面都是 **0.16.0 应用里的真实三维渲染**。点击图片可以查看透明 PNG 原图。
+下面都是 **0.17.0 应用里的真实三维渲染**。点击图片可以查看透明 PNG 原图。
 
 <table>
   <tr>
     <td align="center"><a href="docs/assets/mood-slacking.png"><img src="docs/assets/mood-slacking.png" alt="摸摸鱼：黄绿色史莱姆睁着圆眼睛，用两只小手抚摸蓝色小鱼" width="220"></a><br><strong>摸摸鱼</strong><br><sub>鱼是真的，忙是装的</sub></td>
-    <td align="center"><a href="docs/assets/mood-confident.png"><img src="docs/assets/mood-confident.png" alt="当红炸子鸡：大红色史莱姆双臂向两侧展开、屈肘举着两只鸡腿，眯着弯弯的笑眼、粉色脸颊配W形小嘴，头顶飘着小花" width="220"></a><br><strong>当红炸子鸡</strong><br><sub>现在正是我的主场</sub></td>
+    <td align="center"><a href="docs/assets/mood-confident.png"><img src="docs/assets/mood-confident.png" alt="当红炸子鸡：柔和红色史莱姆挺身扬脸，戴鸡腿元素墨镜，两只悬浮圆手拿着酥皮炸鸡，周围有小星星" width="220"></a><br><strong>当红炸子鸡</strong><br><sub>现在正是我的主场</sub></td>
+    <td align="center"><a href="docs/assets/mood-suffering.png"><img src="docs/assets/mood-suffering.png" alt="煎熬：平铺的煎蛋，薄蛋黄上拧着眉、咬紧牙，蛋白有浅焦边与热气" width="220"></a><br><strong>煎熬</strong><br><sub>正在被生活煎</sub></td>
   </tr>
 </table>
 
@@ -60,7 +61,7 @@
 
 它有真正的三维身体、光照和软体形变。按住会压扁，拉动会伸长，松手再弹回来；捏疼了会贴上小绷带。五官随着身体变化，眼睛会看向鼠标，也会自然眨眼。
 
-新增的「摸摸鱼」会把一条小蓝鱼放在身前：一只手扶着，一只手轻轻摸，鱼尾也会轻摆。按住揉捏或启用减少动态时，摸鱼动作暂停。「当红炸子鸡」是一颗大红色小球，双臂向两侧展开、屈肘举着两只立体鸡腿，眯着弯弯的笑眼，粉色脸颊配上 W 形小嘴，头顶的小花轻轻晃动。
+新增的「摸摸鱼」会把一条小蓝鱼放在身前：一只手扶着，一只手轻轻摸，鱼尾也会轻摆。按住揉捏或启用减少动态时，摸鱼动作暂停。「当红炸子鸡」挺起柔和红色的身体，戴着鸡腿元素墨镜，两只悬浮小圆手拿着酥皮炸鸡，周围星光轻闪。「煎熬」则摊成一枚扁平煎蛋：薄蛋黄上的五官还在硬撑，奶白蛋白带一点焦边和热气。
 
 | 想做什么 | 怎么操作 |
 | :--- | :--- |
@@ -108,7 +109,7 @@
 <a id="start"></a>
 ## 把它带到桌面
 
-当前版本 **0.16.0**。支持 **macOS 13+**，需要 Git 和 Xcode Command Line Tools。应用使用 AppKit、WKWebView 与仓库内的 Three.js，构建无需安装 npm 依赖。
+当前版本 **0.17.0**。支持 **macOS 13+**，需要 Git 和 Xcode Command Line Tools。应用使用 AppKit、WKWebView 与仓库内的 Three.js，构建无需安装 npm 依赖。
 
 在终端执行：
 
@@ -140,7 +141,7 @@ open 'dist/心晴.app' --args --show-pet
 
 这里包含 `moods.json`、备份和皮肤图集。备份时保存整个目录；不要通过删除存档来修复界面问题。
 
-旧记录可以继续使用。记录过新状态后，较老版本可能不认识新增的状态标识，例如「坐牢」和 0.16.0 新增的「摸摸鱼」「当红炸子鸡」；降级前请核对版本兼容性。
+旧记录可以继续使用。记录过新状态后，较老版本可能不认识新增的状态标识，例如「坐牢」和 本次新增的「摸摸鱼」「当红炸子鸡」「煎熬」；降级前请核对版本兼容性。
 
 心情记录保存在本机。通知桥接处理生命周期标识与本地聊天标题，不存储消息正文。仓库中的展示图片来自合成测试，仅含三维角色，不含真实聊天或心情记录。
 

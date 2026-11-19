@@ -360,10 +360,10 @@
     setMood(mood) {
       if(this.mood!==mood)this.moodChangedAt=this.clock;
       this.mood=mood;
-      const colors={calm:'#79B994',happy:'#FFDA70',sad:'#79A9D2',anxious:'#A68ACB',angry:'#D97E69',tired:'#9B8DB2',resigned:'#BEA16F',speechless:'#79AFB8',overwhelmed:'#9D96AA',sleepy:'#7892AC',verytired:'#9B8DB2',headache:'#C48F9A',sick:'#DDB898',coding:'#6F9FAA',jailed:'#8E96BC',slacking:'#A6BD64',confident:'#D9232E'};
+      const colors={calm:'#79B994',happy:'#FFDA70',sad:'#79A9D2',anxious:'#A68ACB',angry:'#D97E69',tired:'#9B8DB2',resigned:'#BEA16F',speechless:'#79AFB8',overwhelmed:'#9D96AA',sleepy:'#7892AC',verytired:'#9B8DB2',headache:'#C48F9A',sick:'#DDB898',coding:'#6F9FAA',jailed:'#8E96BC',slacking:'#A6BD64',confident:'#C85751',suffering:'#ECAF35'};
       this.color.set(colors[mood]||colors.calm);
       window.webkit?.messageHandlers?.mood?.postMessage({id:0,action:'petTint',color:colors[mood]||colors.calm});
-      if(this.material)this.material.color.copy(this.color);
+      if(this.material){this.material.color.copy(this.color);const transmission=mood==='suffering'?0:.24;if(this.material.transmission!==transmission){this.material.transmission=transmission;this.material.needsUpdate=true;}}
       this.setExpression(mood,!!this.body.hold&&(this.body.press>.55||this.body.deformation>this.body.r*.6));this.draw();this.request();
     }
     async setSkin(skin,source) {
@@ -469,8 +469,23 @@
       this.heart.visible=(this.heartUntil||0)>this.clock;
       if(this.heart.visible){this.heart.position.y+=(1.4-(this.heartUntil-this.clock))*.22;this.heart.scale.setScalar(1+Math.sin(this.clock*9)*.12);}
     }
+    updateView() {
+      const mood=this.image?'calm':this.mood,key=mood+':'+this.width+':'+this.height;
+      if(this.cameraPose===key)return;this.cameraPose=key;
+      const aspect=this.width/this.height;
+      if(mood==='suffering'){
+        const r=7.14,targetY=-.59,pitch=.90;
+        this.camera.position.set(0,targetY+r*Math.sin(pitch),r*Math.cos(pitch));this.camera.lookAt(0,targetY,0);
+        this.camera.zoom=Math.min(1.10,aspect*.90);
+      }else{
+        this.camera.position.set(0,1.4,7);this.camera.lookAt(0,.04,0);
+        this.camera.zoom=mood==='confident'?Math.min(1,aspect*.82):1;
+      }
+      this.camera.updateProjectionMatrix();
+    }
     draw() {
       if(!this.renderer||this.contextLost)return;
+      this.updateView();
       const out={};
       this.body.setRestPose(this.image?'calm':this.mood);
       const pose=[this.body.restHeight,this.body.restWidth,...this.body.values].map(v=>v.toFixed(5)).join(',');
@@ -505,8 +520,10 @@
       this.group.position.x=0;
       this.group.rotation.y=this.reduced.matches?0:this.look.x+Math.sin(this.clock*.64)*.055;
       this.group.rotation.x=this.reduced.matches?0:-this.look.y+(sleepyPose?Math.sin(this.clock*.7)*.035:0);
+      if(this.mood==='confident'&&!this.image&&!this.body.hold){this.group.rotation.x-=.16;this.group.position.y+=.025;}
       const tilt=this.mood==='sleepy'?-.09:this.mood==='sad'?-.045:this.mood==='tired'?.06:this.mood==='anxious'?.035:this.mood==='resigned'?-.065:0;
       this.group.rotation.z=(!expressive?0:tilt+Math.sin(this.clock*.82)*.022+joy*.8+(this.facialState?.angry?Math.sin(this.clock*11)*.006:0))+(this.reduced.matches?0:this.rolling.angle);
+      if(this.mood==='suffering'&&!this.image){this.group.rotation.x=0;this.group.rotation.z=0;}
       if(suspended){this.group.position.y+=.16;this.group.position.x=-Math.sin(this.group.rotation.z)*.55;}
       if(this.rolling.moving){
         const positions=(this.image?this.skinMesh:this.mesh).geometry.attributes.position;
