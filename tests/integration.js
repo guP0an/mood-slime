@@ -273,7 +273,7 @@ for(const mood of MoodModel.moods){
     const clock=app.pet.clock,reduced=app.pet.reduced;
     app.pet.reduced={matches:false};app.pet.clock=['sleepy','sick','headache','verytired'].includes(mood.id)?4.9:3.94;app.pet.draw();
     check(newFace.eyes.every(e=>e.upper===e.lower&&!e.white.mesh.visible&&!e.iris.mesh.visible&&!e.glint.mesh.visible&&e.lid.mesh.visible),'fully closed '+mood.id+' eyes show a single soft lid without sclera or highlights');
-    app.pet.clock=1;app.pet.draw();check(newFace.eyes.every(e=>e.white.mesh.visible&&e.iris.mesh.visible),'eyes reopen after blinking: '+mood.id);
+    app.pet.clock=1;app.pet.draw();check(newFace.eyes.every(e=>mood.id==='confident'?!e.white.mesh.visible&&!e.iris.mesh.visible&&e.lid.mesh.visible:e.white.mesh.visible&&e.iris.mesh.visible),'eyes return to the mood resting expression after blinking: '+mood.id);
     app.pet.reduced={matches:true};app.pet.clock=2;app.pet.draw();const stillEyes=JSON.stringify(newFace.eyes.map(e=>[e.dx,e.dy,e.open]));app.pet.clock=9;app.pet.draw();
     check(JSON.stringify(newFace.eyes.map(e=>[e.dx,e.dy,e.open]))===stillEyes,'reduced motion freezes the new face: '+mood.id);
     app.pet.reduced=reduced;app.pet.clock=clock;app.pet.draw();
@@ -302,7 +302,7 @@ for(const mood of MoodModel.moods){
     check(ropeEnd.distanceTo(end)<.001&&app.pet.group.position.y>.2&&app.pet.shadow.material.opacity<1,'rope stays attached to the raised ball and the ground shadow softens');
   }
   if(mood.id==='headache')check(newFace.wraps.length===2&&newFace.wraps.every(m=>m.visible),'headache wears two overlapping white head wraps');
-  if(mood.id==='confident')check(newFace.liftingArms.length===2&&newFace.drumsticks.length===2&&!newFace.crown&&newFace.sparkles.length===2&&newFace.smile.mesh.visible&&app.pet.color.getHexString()==='d9232e'&&bodyPixel[0]>bodyPixel[1]*1.3&&bodyPixel[0]>bodyPixel[2]*1.3,'red champion raises two drumsticks with an ivory grin and celebratory stars');
+  if(mood.id==='confident')check(newFace.liftingArms.length===2&&newFace.drumsticks.length===2&&newFace.drumsticks.every((d,i)=>Math.abs(d.position.x+newFace.liftingArms[i].position.x)>1.15)&&!newFace.crown&&newFace.flowers.length===2&&newFace.blush.length===2&&newFace.smile.mesh.geometry.type==='TubeGeometry'&&newFace.eyes.every(e=>e.lid.mesh.visible&&!e.iris.mesh.visible)&&app.pet.color.getHexString()==='d9232e'&&bodyPixel[0]>bodyPixel[1]*1.3&&bodyPixel[0]>bodyPixel[2]*1.3,'red champion raises two drumsticks with a W smile, smiling closed eyes, pink cheeks and flowers');
   if(mood.id==='slacking'){
     check(newFace.fish.visible&&newFace.hands.length===2&&app.pet.color.getHexString()==='a6bd64','slacking has a blue 3D fish, two hands and yellow green body');
     const clock=app.pet.clock,reduced=app.pet.reduced;app.pet.reduced={matches:false};app.pet.clock=1;app.pet.draw();const hand=newFace.hands[1].position.clone();app.pet.clock=1.6;app.pet.draw();check(hand.distanceTo(newFace.hands[1].position)>.01,'slacking hand really strokes fish in native renderer');

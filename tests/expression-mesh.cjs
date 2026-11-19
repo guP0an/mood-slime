@@ -46,7 +46,7 @@ for(const mood of Object.keys(profiles)){
     if(eye.rim)assert.equal(eye.rim.mesh.visible,false,'illness rim disappears on complete closure');
   }
   pet.clock=1;pet.attachFeatures();
-  for(const eye of face.eyes)assert(eye.white.mesh.visible&&eye.iris.mesh.visible,'eye reopens after a blink');
+  for(const eye of face.eyes){if(mood==='confident')assert(!eye.white.mesh.visible&&!eye.iris.mesh.visible&&eye.lid.mesh.visible,'confident keeps the reference smiling closed eyes');else assert(eye.white.mesh.visible&&eye.iris.mesh.visible,'eye reopens after a blink');}
   }
   if(mood==='sleepy')assert(face.eyes.every(e=>e.shadow&&e.shadow.mesh.material.transparent),'sleepy has soft under-eye shading');
   pet.reduced=savedReduced;
@@ -107,11 +107,13 @@ assert(smileEnd[1]-smileStart[1]>.05,'right smile corner curls upward');
 assert(smileCenter[1]<smileStart[1]-.08,'smile has a rounded lower sweep');
 
 const confident=pet.studyFaces.confident;
-assert(confident&&confident.liftingArms?.length===2&&confident.drumsticks?.length===2&&confident.sparkles.length===2,'confidence raises two chicken drumsticks like a weightlifting champion');
+assert(confident&&confident.liftingArms?.length===2&&confident.drumsticks?.length===2&&confident.flowers.length===2,'confidence raises two chicken drumsticks like a weightlifting champion');
 assert(!confident.crown,'red champion replaces the previous crown concept');
-for(const drumstick of confident.drumsticks)assert(drumstick.position.y>.65,'chicken is held above shoulder level');
+for(const [i,drumstick] of confident.drumsticks.entries()){const arm=confident.liftingArms[i];assert(Math.abs(arm.position.x+drumstick.position.x)>1.15,'hands are spread outside the left and right sides of the body');assert(drumstick.position.y>.35,'elbows flex upward beside the body');}
 pet.mood='confident';pet.clock=1;pet.reduced={matches:false};pet.attachFeatures();
 assert(confident.eyes[0].v!==confident.eyes[1].v,'confident eyes have asymmetric placement');
-assert(confident.smile.mesh.geometry.type==='ShapeGeometry','confidence has a shaped ivory grin');
-const glow=confident.sparkles[0].scale.x;pet.clock=1.7;pet.attachFeatures();assert(Math.abs(glow-confident.sparkles[0].scale.x)>.005);
-pet.reduced={matches:true};pet.attachFeatures();const stillSpark=confident.sparkles[0].scale.x;pet.clock=8;pet.attachFeatures();assert.equal(confident.sparkles[0].scale.x,stillSpark);
+assert(confident.smile.mesh.geometry.type==='TubeGeometry','confidence has the reference soft W mouth');
+assert(confident.blush.length===2,'confidence has two pink cheeks');
+assert(confident.eyes.every(e=>!e.white.mesh.visible&&!e.iris.mesh.visible&&e.lid.mesh.visible),'confidence uses smiling arcs instead of the earlier half-lidded look');
+const glow=confident.flowers[0].scale.x;pet.clock=1.7;pet.attachFeatures();assert(Math.abs(glow-confident.flowers[0].scale.x)>.005);
+pet.reduced={matches:true};pet.attachFeatures();const stillSpark=confident.flowers[0].scale.x;pet.clock=8;pet.attachFeatures();assert.equal(confident.flowers[0].scale.x,stillSpark);
