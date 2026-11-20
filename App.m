@@ -45,6 +45,7 @@
 @property NSPopover *messagePopover;
 @property NSTimer *alertTimer;
 @property BOOL alertPolling;
+@property BOOL closePromptOpen;
 @property id displayObserver,spaceObserver;
 @property NSString *displayID;
 @property NSStatusItem *statusItem;
@@ -85,7 +86,7 @@
     WKWebViewConfiguration *configuration=[WKWebViewConfiguration new];configuration.websiteDataStore=WKWebsiteDataStore.nonPersistentDataStore;
     [configuration.userContentController addScriptMessageHandler:self name:@"mood"];
     NSMutableDictionary *boot=[@{@"state":self.store.state,@"readOnly":@(self.store.readOnly),@"testing":@(self.testing)} mutableCopy];
-    if(self.store.warning)boot[@"warning"]=self.store.warning;NSString *skin=[self.store skinSource];if(skin)boot[@"skinSource"]=skin;
+    if(self.store.warning)boot[@"warning"]=self.store.warning;
     NSData *data=[NSJSONSerialization dataWithJSONObject:boot options:0 error:NULL];NSString *json=[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
     [configuration.userContentController addUserScript:[[WKUserScript alloc] initWithSource:[@"window.__moodBoot=" stringByAppendingString:json] injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
     self.web=[[WKWebView alloc] initWithFrame:NSMakeRect(0,0,1040,810) configuration:configuration];self.web.navigationDelegate=self;
@@ -165,6 +166,12 @@
     NSDictionary *body=message.body;NSNumber *identifier=body[@"id"];NSString *action=body[@"action"];
     if(![identifier isKindOfClass:NSNumber.class]||![action isKindOfClass:NSString.class])return;
     if([action isEqual:@"petTint"]){[self applyPetTint:body[@"color"]];return;}
+    if([action isEqual:@"closePromptDismissed"]){self.closePromptOpen=NO;[self refreshCodexButton];[self reply:identifier value:@{@"ok":@YES}];return;}
+    if([action isEqual:@"confirmQuit"]){
+        if(!self.closePromptOpen){[self reply:identifier value:@{@"ok":@NO}];return;}
+        [self reply:identifier value:@{@"ok":@YES}];[NSApp terminate:nil];return;
+    }
+    if(self.testing&&[action isEqual:@"testClosePrompt"]){[self windowShouldClose:self.window];[self reply:identifier value:@{@"ok":@YES}];return;}
     if([action isEqual:@"save"]) {
         if(self.testing&&self.failNextSave){self.failNextSave=NO;[self reply:identifier value:@{@"ok":@NO,@"error":@"合成测试：磁盘写入失败，原记录已保留。"}];return;}
         NSDictionary *state=body[@"data"];if(![state isKindOfClass:NSDictionary.class]){[self reply:identifier value:@{@"ok":@NO,@"error":@"记录格式无效。"}];return;}
@@ -252,11 +259,16 @@
     if(self.testing&&[action isEqual:@"testWindowLifecycle"]){[self reply:identifier value:@{@"visible":@(self.window.visible),@"keepsRunning":@(![self applicationShouldTerminateAfterLastWindowClosed:NSApp]),@"webAttached":@(self.web.window==self.window),@"desktop":@(self.desktop)}];return;}
     if([action isEqual:@"hide"]) {[NSApp hide:nil];[self reply:identifier value:@{@"ok":@YES}];return;}
     if([action isEqual:@"storage"]) {[NSWorkspace.sharedWorkspace openURL:self.store.root];[self reply:identifier value:@{@"ok":@YES}];return;}
-    if([action isEqual:@"importSkin"]) {
-        if(self.store.readOnly){[self reply:identifier value:@{@"ok":@NO,@"error":@"存档处于保护模式，暂时不能更换皮肤。"}];return;}
-        NSOpenPanel *panel=[NSOpenPanel openPanel];panel.allowedContentTypes=@[UTTypePNG,UTTypeJPEG,UTTypeGIF,UTTypeWebP];panel.allowsMultipleSelection=NO;panel.canChooseDirectories=NO;panel.message=@"选择图片或动图，最大 15 MB、60 帧。";
-        [panel beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse response){if(response!=NSModalResponseOK){[self reply:identifier value:@{@"ok":@NO,@"cancelled":@YES}];return;}NSURL *url=panel.URL;
-            self.pendingIO++;dispatch_async(self.io,^{NSError *error=nil;NSDictionary *result=[self.store importImage:url error:&error];dispatch_async(dispatch_get_main_queue(),^{[self reply:identifier value:result?:@{@"ok":@NO,@"error":error.localizedDescription?:@"皮肤导入失败。"}];[self ioFinished];});});}];return;
+    if([action isEqual:@"skinSource"]) {
+        id mood=body[@"mood"],skinID=body[@"skinID"];
+        self.pendingIO++;
+        dispatch_async(self.io,^{
+            NSString *source=[self.store skinSourceForMood:mood expectedID:skinID];
+            dispatch_async(dispatch_get_main_queue(),^{
+                [self reply:identifier value:source?@{@"ok":@YES,@"source":source}:@{@"ok":@NO}];
+                [self ioFinished];
+            });
+        });return;
     }
     if([action isEqual:@"export"]) {
         NSSavePanel *panel=[NSSavePanel savePanel];panel.allowedContentTypes=@[UTTypeJSON];panel.nameFieldStringValue=@"心晴-心情记录.json";
@@ -300,9 +312,9 @@
     }
     sizeItem.submenu=sizes;[menu addItem:sizeItem];
     NSMenu *options=[NSMenu new];options.autoenablesItems=NO;
-    for(NSArray *entry in @[@[@"换个模样…",@"skin"],@[@"恢复小糯团",@"resetSkin"],@[@"导出心情记录…",@"export"],@[@"打开存档位置",@"storage"]]){
+    for(NSArray *entry in @[@[@"换个模样…",@"skin"],@[@"清除通用形象",@"resetSkin"],@[@"导出心情记录…",@"export"],@[@"打开存档位置",@"storage"]]){
         NSMenuItem *item=[self menuItem:entry[0] command:entry[1]];
-        if([entry[1] isEqual:@"resetSkin"])item.enabled=[state[@"skin"] isKindOfClass:NSDictionary.class]&&!self.store.readOnly&&self.pendingIO==0;
+        if([entry[1] isEqual:@"resetSkin"])item.enabled=[state[@"skin"] isKindOfClass:NSDictionary.class]&&![state[@"sharedAppearance"] isEqual:@"default"]&&!self.store.readOnly&&self.pendingIO==0;
         if([entry[1] isEqual:@"skin"])item.enabled=!self.store.readOnly&&self.pendingIO==0;
         [options addItem:item];
     }
@@ -372,7 +384,7 @@
     NSMutableParagraphStyle *paragraph=[NSMutableParagraphStyle new];paragraph.alignment=NSTextAlignmentCenter;
     self.codexButton.attributedTitle=[[NSAttributedString alloc] initWithString:title attributes:@{NSForegroundColorAttributeName:[NSColor colorWithSRGBRed:.25 green:.21 blue:.18 alpha:1],NSFontAttributeName:self.codexButton.font,NSParagraphStyleAttributeName:paragraph}];
     self.codexButton.toolTip=@"戳戳我，看看 Codex 送来的小纸条；点一条就回到对应聊天";
-    self.codexButton.hidden=count==0;
+    self.codexButton.hidden=count==0||self.closePromptOpen;
     if(self.messagePopover.shown){self.messagePopover.contentViewController=[self codexMessageContent];self.messagePopover.contentSize=self.messagePopover.contentViewController.view.frame.size;}
     // Metadata-only receipt lets the local bridge verify delivery without reading chats or screenshots.
     NSMutableArray *receipts=[NSMutableArray new];
@@ -591,7 +603,11 @@
     NSURL *testURL=[NSBundle.mainBundle.resourceURL URLByAppendingPathComponent:@"integration.js"];
     NSString *script=[NSString stringWithContentsOfURL:testURL encoding:NSUTF8StringEncoding error:NULL];
     if(!script){[self finish:@"缺少集成测试脚本"];return;}
-    [self.web callAsyncJavaScript:script arguments:@{} inFrame:nil inContentWorld:WKContentWorld.pageWorld completionHandler:^(id result,NSError *error){
+    NSArray *arguments=NSProcessInfo.processInfo.arguments;
+    [self.web callAsyncJavaScript:script arguments:@{
+        @"closeDialogOnly":@([arguments containsObject:@"--close-dialog-only"]),
+        @"skinDialogOnly":@([arguments containsObject:@"--skin-dialog-only"])
+    } inFrame:nil inContentWorld:WKContentWorld.pageWorld completionHandler:^(id result,NSError *error){
         if(error||![result isKindOfClass:NSArray.class]){[self finish:error.userInfo[@"WKJavaScriptExceptionMessage"]?:error.localizedDescription?:@"集成测试未返回结果"];return;}
         if(self.desktop||self.window.level!=NSNormalWindowLevel){[self finish:@"原生窗口恢复失败"];return;}
         NSError *loadError=nil;NSData *bytes=[NSData dataWithContentsOfURL:[self.store.root URLByAppendingPathComponent:@"moods.json"] options:0 error:&loadError];NSDictionary *disk=bytes?[NSJSONSerialization JSONObjectWithData:bytes options:0 error:&loadError]:nil;
@@ -625,7 +641,7 @@
         BOOL ok=png&&[png writeToURL:[self.artifacts URLByAppendingPathComponent:name] options:NSDataWritingAtomic error:NULL];
         [self reply:identifier value:@{@"ok":@(ok)}];return;
     }
-    if(!self.artifacts||![@[@"calendar.png",@"squashed.png",@"stretch.png",@"desktop.png",@"rolling.png",@"happy-bandaged.png",@"time-axis.png",@"skin.png",@"mood-calm.png",@"mood-happy.png",@"mood-sad.png",@"mood-angry.png",@"mood-anxious.png",@"mood-tired.png",@"mood-resigned.png",@"mood-speechless.png",@"mood-overwhelmed.png",@"mood-sleepy.png",@"mood-verytired.png",@"mood-headache.png",@"mood-sick.png",@"mood-coding.png",@"mood-jailed.png",@"mood-slacking.png",@"mood-confident.png",@"mood-suffering.png",@"gaze-0.png",@"gaze-1.png",@"gaze-2.png",@"gaze-3.png",@"gaze-4.png",@"gaze-5.png"] containsObject:name]){[self reply:identifier value:@{@"ok":@YES,@"skipped":@YES}];return;}
+    if(!self.artifacts||![@[@"close-prompt.png",@"calendar.png",@"squashed.png",@"stretch.png",@"desktop.png",@"rolling.png",@"happy-bandaged.png",@"time-axis.png",@"skin.png",@"mood-calm.png",@"mood-happy.png",@"mood-sad.png",@"mood-angry.png",@"mood-anxious.png",@"mood-tired.png",@"mood-resigned.png",@"mood-speechless.png",@"mood-overwhelmed.png",@"mood-sleepy.png",@"mood-verytired.png",@"mood-headache.png",@"mood-sick.png",@"mood-coding.png",@"mood-jailed.png",@"mood-slacking.png",@"mood-confident.png",@"mood-suffering.png",@"gaze-0.png",@"gaze-1.png",@"gaze-2.png",@"gaze-3.png",@"gaze-4.png",@"gaze-5.png"] containsObject:name]){[self reply:identifier value:@{@"ok":@YES,@"skipped":@YES}];return;}
     [NSFileManager.defaultManager createDirectoryAtURL:self.artifacts withIntermediateDirectories:YES attributes:nil error:NULL];
     WKSnapshotConfiguration *configuration=[WKSnapshotConfiguration new];configuration.afterScreenUpdates=YES;
     [self.web takeSnapshotWithConfiguration:configuration completionHandler:^(NSImage *image,NSError *error){NSBitmapImageRep *bitmap=image?[[NSBitmapImageRep alloc] initWithData:image.TIFFRepresentation]:nil;NSData *png=[bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}];BOOL ok=png&&[png writeToURL:[self.artifacts URLByAppendingPathComponent:name] options:NSDataWritingAtomic error:NULL];[self reply:identifier value:@{@"ok":@(ok),@"error":error.localizedDescription?:@""}];}];
@@ -636,6 +652,19 @@
     if(self.lockFD>=0){flock(self.lockFD,LOCK_UN);close(self.lockFD);self.lockFD=-1;}
     if(self.testRoot)[NSFileManager.defaultManager removeItemAtURL:self.testRoot error:NULL];
     if(error){fprintf(stderr,"FAIL: %s\n",error.UTF8String);exit(1);}exit(0);
+}
+- (BOOL)windowShouldClose:(NSWindow *)sender {
+    if(sender!=self.window||self.desktop)return YES;
+    if(self.closePromptOpen||sender.attachedSheet)return NO;
+    self.closePromptOpen=YES;
+    [self.messagePopover performClose:nil];self.codexButton.hidden=YES;
+    [self.web callAsyncJavaScript:@"await window.moodApp.ready; return window.moodApp.requestClose();" arguments:@{} inFrame:nil inContentWorld:WKContentWorld.pageWorld completionHandler:^(id result,NSError *error){
+        if(error||![result boolValue]){
+            self.closePromptOpen=NO;[self refreshCodexButton];
+            NSAlert *failure=[NSAlert new];failure.messageText=@"暂时无法显示关闭选项";failure.informativeText=@"请稍后再试，或从菜单选择退出心晴。";[failure beginSheetModalForWindow:self.window completionHandler:nil];
+        }
+    }];
+    return NO;
 }
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {if(self.pendingIO){self.terminating=YES;return NSTerminateLater;}return NSTerminateNow;}
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender{return !self.desktop&&!self.window.visible;}

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>心晴 · 角色预览</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f7f4ef; color: #233b36; font: 15px system-ui, sans-serif; }
+    canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+    canvas:active { cursor: grabbing; }
+    canvas:focus-visible { outline: 2px solid #447264; outline-offset: -5px; }
+    header { position: fixed; top: 24px; left: 28px; pointer-events: none; }
+    h1 { margin: 0; font-size: 22px; font-weight: 650; }
+    nav { display: flex; gap: 6px; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); }
+    button { cursor: pointer; height: 40px; min-width: 64px; padding: 0 10px; border: 1px solid #a6b9af;
+      border-radius: 6px; background: #f7faf8; color: inherit; font: inherit; }
+    button[aria-pressed="true"] { color: #fff; background: #34594d; border-color: #34594d; }
+    [role="alert"] { position: fixed; inset: 45% 16px auto; text-align: center; }
+  </style>
+  <script src="vendor/three.min.js"></script>
+  <script src="pet.js"></script>
+</head>
+<body>
+  <canvas aria-label="不开心的橘子角色，拖动或用方向键旋转" tabindex="0"></canvas>
+  <header><h1>不开心的橘子</h1></header>
+  <nav aria-label="视角">
+    <button data-angle="0" aria-pressed="true">正面</button>
+    <button data-angle="-1.08" aria-pressed="false">斜侧</button>
+    <button data-angle="-1.5707963268" aria-pressed="false">侧面</button>
+    <button data-angle="-2.16" aria-pressed="false">后侧</button>
+  </nav>
+  <p role="alert" hidden>这台设备无法开启 3D 预览。</p>
+  <script>
+    (() => {
+      const T = window.THREE;
+      const canvas = document.querySelector('canvas');
+      let renderer;
+      try { renderer = new T.WebGLRenderer({canvas, antialias:true, preserveDrawingBuffer:true}); }
+      catch {
+        document.querySelector('[role="alert"]').hidden = false;
+        document.querySelector('nav').hidden = true;
+        return;
+      }
+      renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+      renderer.outputColorSpace = T.SRGBColorSpace;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = T.PCFSoftShadowMap;
+      const scene = new T.Scene();
+      scene.background = new T.Color(0xf7f4ef);
+      const camera = new T.OrthographicCamera(-2,2,2,-2,.1,30);
+      const figure = MoodPet.createOrangeCompanion();
+      scene.add(figure,new T.HemisphereLight(0xfffbf4,0xe3cbb8,2.12));
+      const key = new T.DirectionalLight(0xfff3e4,1.53);
+      key.position.set(-3.5,7,4.5);
+      key.target.position.y=1.8;
+      key.castShadow=true;
+      key.shadow.mapSize.set(1024,1024);
+      Object.assign(key.shadow.camera,{left:-2.8,right:2.8,top:2.8,bottom:-2.8,near:.5,far:14});
+      key.shadow.normalBias=.025;
+      key.shadow.intensity=.44;
+      const rim = new T.DirectionalLight(0xfff2dc,.81);
+      rim.position.set(2,4,-3);
+      const fill = new T.DirectionalLight(0xffffff,.44);
+      fill.position.set(4,2,5);
+      scene.add(key,key.target,rim,fill);
+
+      const shadowImage = document.createElement('canvas');
+      shadowImage.width = shadowImage.height = 128;
+      const context = shadowImage.getContext('2d');
+      const shading = context.createRadialGradient(64,64,5,64,64,64);
+      shading.addColorStop(0,'rgba(62,47,38,.31)');
+      shading.addColorStop(.55,'rgba(62,47,38,.16)');
+      shading.addColorStop(1,'rgba(62,47,38,0)');
+      context.fillStyle = shading;
+      context.fillRect(0,0,128,128);
+      const shadow = new T.Mesh(new T.PlaneGeometry(3.90,3.1),new T.MeshBasicMaterial({
+        map:new T.CanvasTexture(shadowImage), transparent:true, depthWrite:false
+      }));
+      shadow.rotation.x = -Math.PI/2;
+      shadow.position.z = .15;
+      scene.add(shadow);
+
+      const viewButtons = [...document.querySelectorAll('[data-angle]')];
+      const targetY=2;
+      const homePitch=.105;
+      let yaw = 0;
+      let pitch = homePitch;
+      let drag = null;
+      function draw() {
+        figure.rotation.y = yaw;
+        camera.zoom = 1/(1+.15*T.MathUtils.smoothstep(pitch,.27,.76));
+        camera.updateProjectionMatrix();
+        camera.position.set(0,targetY+Math.sin(pitch)*8,Math.cos(pitch)*8);
+        camera.lookAt(0,targetY,0);
+        renderer.render(scene,camera);
+      }
+      function fit() {
+        const {clientWidth:width,clientHeight:height} = canvas;
+        const aspect = width/height;
+        const vertical = Math.max(2.58,1.65/aspect);
+        camera.left = -vertical*aspect;
+        camera.right = vertical*aspect;
+        camera.top = vertical;
+        camera.bottom = -vertical;
+        renderer.setSize(width,height,false);
+        draw();
+      }
+      function select(button) {
+        viewButtons.forEach(control => control.setAttribute('aria-pressed',String(control === button)));
+      }
+      viewButtons.forEach(button => button.addEventListener('click',() => {
+        yaw = Number(button.dataset.angle);
+        pitch = homePitch;
+        select(button);
+        draw();
+      }));
+      canvas.addEventListener('pointerdown',event => {
+        if (drag || event.button !== 0) return;
+        drag = {id:event.pointerId,x:event.clientX,y:event.clientY};
+        canvas.setPointerCapture(event.pointerId);
+      });
+      canvas.addEventListener('pointermove',event => {
+        if (drag?.id !== event.pointerId) return;
+        yaw += (event.clientX-drag.x)*.01;
+        pitch = T.MathUtils.clamp(pitch+(event.clientY-drag.y)*.008,-.12,1.03);
+        drag.x = event.clientX;
+        drag.y = event.clientY;
+        select(null);
+        draw();
+      });
+      canvas.addEventListener('lostpointercapture',() => { drag = null; });
+      canvas.addEventListener('keydown',event => {
+        const change = {ArrowLeft:[-.18,0],ArrowRight:[.18,0],ArrowUp:[0,.10],ArrowDown:[0,-.10]}[event.key];
+        if (!change) return;
+        event.preventDefault();
+        yaw += change[0];
+        pitch = T.MathUtils.clamp(pitch+change[1],-.12,1.03);
+        select(null);
+        draw();
+      });
+      new ResizeObserver(fit).observe(canvas);
+      fit();
+    })();
+  </script>
+</body>
+</html>

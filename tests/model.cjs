@@ -5,6 +5,21 @@ const M=require('../web/model.js');
 let checks=0;
 function test(name,fn){fn();checks++;console.log('PASS:',name);}
 const time=s=>new Date(s);
+test('legacy saves and independent mood skin manifests validate',()=>{
+  const legacy=M.empty();
+  assert.deepEqual(M.validate(legacy),legacy);
+  const skin={id:'00000000-0000-4000-8000-000000000000',name:'test',size:16,columns:1,durations:[.1]};
+  const state={...legacy,moodSkins:{happy:skin,sad:{...skin,name:'other'}}};
+  assert.deepEqual(M.validate(state),state);
+  assert.deepEqual(M.record(state,'calm','',new Date(),'test').moodSkins,state.moodSkins);
+  const chosen={...state,sharedAppearance:'default',moodAppearances:{happy:'slime',sad:'orange',calm:'default'}};
+  assert.deepEqual(M.validate(chosen),chosen);
+  assert.throws(()=>M.validate({...state,moodAppearances:{happy:'orange'}}));
+  assert.throws(()=>M.validate({...state,moodAppearances:{constructor:'slime'}}));
+  for(const moodSkins of [null,[],{unknown:skin},{constructor:skin},{happy:null},{sad:{...skin,id:'-'.repeat(36)}}]){
+    assert.throws(()=>M.validate({...legacy,moodSkins}));
+  }
+});
 test('empty data never invents a mood or a daily recap',()=>{
   assert.deepEqual(M.closeDays(M.empty(),time('2026-11-04T12:00:00+08:00')),M.empty());
   assert.equal(M.summarize(M.empty(),'2026-11-03'),null);

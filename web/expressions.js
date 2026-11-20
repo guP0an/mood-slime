@@ -462,7 +462,7 @@
     }
     attachFeatures(){
       super.attachFeatures();if(!this.studyFaces)return;
-      const face=this.studyFaces[this.mood],active=!!(face&&!this.image&&!this.facialState.hurt);
+      const face=this.studyFaces[this.mood],active=!!(face&&!this.image&&this.character!=='orange'&&!this.facialState.hurt);
       Object.values(this.studyFaces).forEach(f=>f.group.visible=active&&f===face);
       this.studyState={active:!!active,mood:this.mood};if(!active)return;
       this.features.forEach(f=>f.visible=false);

@@ -4,11 +4,67 @@ function check(value,label){if(!value)throw Error(label);checks.push(label);}
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const app=window.moodApp;
 const native=(action,data={})=>new Promise(resolve=>{const id=100000+Math.floor(Math.random()*100000);const original=window.nativeReply;window.nativeReply=(rid,value)=>{if(rid===id){window.nativeReply=original;resolve(value);}else original(rid,value);};window.webkit.messageHandlers.mood.postMessage({id,action,...data});});
+async function checkMoodSkins(sharedSkin){
+  const happySkin=await native('testImportSkin'),sadSkin=await native('testImportSkin');
+  document.getElementById('import-skin').click();
+  check(document.getElementById('skin-info').open&&document.querySelectorAll('#mood-skins > li').length===MoodModel.moods.length,'appearance dialog lists all supported moods');
+  check(await app.applyImportedSkin(happySkin,'happy')&&await app.applyImportedSkin(sadSkin,'sad'),'legacy appearances are available for each mood');
+  const close=()=>document.querySelector('#skin-info [aria-label="关闭"]').click();
+  close();
+  const selectMood=id=>document.querySelector('#mood-options [data-mood="'+id+'"]').click();
+  async function showsSkin(id){
+    for(let i=0;i<50&&((app.pet.skin?.id||null)!==id);i++)await wait(20);
+    return (app.pet.skin?.id||null)===id;
+  }
+  selectMood('happy');check(await showsSkin(happySkin.skin.id),'happy loads its own atlas');
+  selectMood('sad');check(await showsSkin(sadSkin.skin.id),'sad loads its own atlas');
+  selectMood('calm');check(await showsSkin(sharedSkin.id),'unconfigured mood uses the shared skin');
+  const openPicker=mood=>{
+    document.getElementById('import-skin').click();
+    document.querySelector('#mood-skins [data-mood="'+mood+'"] button').click();
+  };
+  const option=choice=>document.querySelector('#appearance-options [data-choice="'+choice+'"]');
+  const choose=async choice=>{option(choice).click();await app.whenIdle();};
+  const closePicker=()=>{document.querySelector('#appearance-picker [aria-label="返回形象列表"]').click();close();};
+  openPicker('happy');
+  check(document.getElementById('appearance-picker').open&&!option('orange'),'picker lists only faces supported for the selected mood');
+  await native('testFailNextSave');
+  await choose('slime');
+  check(option('image').getAttribute('aria-pressed')==='true'&&!app.snapshot().moodAppearances?.happy,'failed write preserves the selected appearance');
+  closePicker();
+  document.getElementById('reset-skin').click();await app.whenIdle();
+  check(app.snapshot().sharedAppearance==='default'&&app.snapshot().skin.id===sharedSkin.id&&await showsSkin(null),'reset stops using the shared image without removing it from the catalog');
+  selectMood('happy');check(await showsSkin(happySkin.skin.id),'clearing shared skin preserves the happy override');
+  openPicker('happy');await choose('slime');
+  check(await showsSkin(null)&&app.snapshot().moodAppearances.happy==='slime'&&app.snapshot().moodSkins.sad.id===sadSkin.skin.id,'choosing happy slime preserves the sad image');
+  closePicker();
+  selectMood('sad');
+  check(await showsSkin(sadSkin.skin.id)&&!app.pet.orangeCompanion?.visible,'a dedicated sad image can still override the built-in model');
+  openPicker('sad');
+  await choose('slime');
+  check(app.pet.mesh.visible&&!app.pet.skinMesh.visible&&option('slime').getAttribute('aria-pressed')==='true','sad uses the native 3D slime when chosen');
+  await choose('orange');
+  const model=app.pet.orangeCompanion;
+  const size=new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+  check(model.visible&&!app.pet.skinMesh.visible&&!app.pet.mesh.visible&&size.z>.75&&!app.pet.studyFaces.sad.group.visible,'sad switches back to the volumetric orange model without overlapping slime features');
+  await choose('image');check(await showsSkin(sadSkin.skin.id),'legacy image remains selectable');
+  await choose('orange');
+  check(app.snapshot().moodAppearances.sad==='orange'&&option('orange').getAttribute('aria-pressed')==='true','model choice is saved and marked in the picker');
+  closePicker();
+}
 await app.ready;
 await native('testShowWindow');
 const visibleDeadline=performance.now()+2500;while(document.hidden&&performance.now()<visibleDeadline)await wait(40);
 check(!document.hidden,'PRECONDITION: native UI verification requires an unlocked Mac and a visible window: '+JSON.stringify(await native('testMenuInfo')));
 await wait(120);
+if(skinDialogOnly){
+  const shared=await native('testImportSkin');
+  check(await app.applyImportedSkin(shared),'shared animated image saves through the native bridge');
+  await checkMoodSkins(shared.skin);
+  await app.desktop(true);
+  await app.desktop(false);
+  return checks;
+}
 check(!!app,'app booted in native WebKit');
 const initialCanvas=document.getElementById('pet'),gl=app.pet.renderer.getContext(),pixel=new Uint8Array(4);
 app.pet.draw();gl.readPixels(Math.floor(initialCanvas.width/2),Math.floor(initialCanvas.height/2),1,1,gl.RGBA,gl.UNSIGNED_BYTE,pixel);
@@ -69,6 +125,24 @@ await wait(80);
 document.getElementById('record-details').open=true;
 check((await native('testSnapshot',{name:'calendar.png'})).ok,'calendar screenshot');
 document.getElementById('record-details').open=false;
+const closeDialog=document.getElementById('close-prompt');
+await native('testClosePrompt');
+const closeDeadline=performance.now()+2000;while(!closeDialog.open&&performance.now()<closeDeadline)await wait(20);
+check(closeDialog.open,'native window close opens the branded confirmation');
+check(document.activeElement.id==='close-desktop','desktop action receives default focus');
+await document.getElementById('close-pet').decode();
+check(document.getElementById('close-pet').naturalWidth>0,'confirmation displays the current rendered pet');
+check(document.getElementById('close-quit').getBoundingClientRect().right<document.getElementById('close-desktop').getBoundingClientRect().left,'quit stays left and desktop stays right');
+check((await native('testSnapshot',{name:'close-prompt.png'})).ok,'branded close confirmation screenshot');
+document.getElementById('close-cancel').click();await wait(80);
+check(!closeDialog.open&&!app.mini,'cancel keeps the calendar open');
+await native('testClosePrompt');await wait(80);
+check(closeDialog.open,'close confirmation can reopen after cancellation');
+document.getElementById('close-desktop').click();
+const desktopDeadline=performance.now()+2500;while((!app.mini||closeDialog.open)&&performance.now()<desktopDeadline)await wait(20);
+check(app.mini&&!closeDialog.open,'confirmation desktop button switches to the real native pet window');
+await app.desktop(false);
+if(closeDialogOnly)return checks;
 const canvas=document.getElementById('pet');
 await showWindow();
 const focusDeadline=performance.now()+2000;while(!document.hasFocus()&&performance.now()<focusDeadline)await wait(40);
@@ -228,12 +302,12 @@ await showWindow();
 const frames=new Set(),frameSamples=[],animationStart=performance.now(),animationClock=app.pet.clock;
 while(performance.now()-animationStart<2000&&frames.size<2){await wait(45);frames.add(app.pet.spriteFrame);frameSamples.push({frame:app.pet.spriteFrame,clock:app.pet.clock,hidden:document.hidden});}
 check(app.pet.reduced.matches?frames.size===1&&frames.has(0):frames.size===2,'animated skin advances both frames, or stays on frame zero under reduced motion: '+JSON.stringify({reduced:app.pet.reduced.matches,frames:[...frames],simulated:app.pet.clock-animationClock,samples:frameSamples,renderErrors}));
-document.getElementById('reset-skin').click();await app.whenIdle();await wait(100);check(!app.snapshot().skin&&!app.pet.image,'reset skin clears saved manifest and renderer');
+await checkMoodSkins(imported.skin);
 check(!app.pending,'no outstanding save');
 await app.desktop(true);await showWindow();
 const eyeKinds=new Set(),eventsBeforeFaces=app.snapshot().events.length;
 for(const mood of MoodModel.moods){
-  app.pet.injury=0;app.pet.delightUntil=0;app.pet.heartUntil=0;app.pet.setMood(mood.id);
+  app.pet.injury=0;app.pet.delightUntil=0;app.pet.heartUntil=0;app.pet.setMood(mood.id,'slime');
   app.pet.look.set(0,0);app.pet.lookTarget.set(0,0);app.pet.attentionUntil=0;
   app.pet.clock=mood.id==='happy'?1.8:mood.id==='tired'?2.7:1;
   app.pet.draw();
