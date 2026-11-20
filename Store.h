@@ -10,7 +10,7 @@
 - (NSDictionary *)load;
 - (BOOL)save:(NSDictionary *)state error:(NSError **)error;
 - (NSDictionary *)importImage:(NSURL *)url error:(NSError **)error;
-- (NSString *)skinSource;
+- (NSString *)skinSourceForMood:(NSString *)mood expectedID:(NSString *)identifier;
 + (BOOL)validState:(id)value;
 @end
 BOOL RunStorageTests(void);

@@ -22,6 +22,12 @@
     return Number.isFinite(d.getTime())&&dayKey(d)===day;
   }
   const empty = () => ({version:1,events:[],summaries:{},skin:null});
+  function validSkin(s) {
+    return s&&typeof s.id==='string'&&/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(s.id)&&
+      typeof s.name==='string'&&s.name.length<=100&&Number.isSafeInteger(s.size)&&s.size>=1&&s.size<=512&&
+      Number.isSafeInteger(s.columns)&&s.columns>=1&&s.columns<=8&&Array.isArray(s.durations)&&
+      s.durations.length>=1&&s.durations.length<=60&&s.durations.every(d=>Number.isFinite(d)&&d>=.02&&d<=10);
+  }
   function validate(value) {
     if(!value||value.version!==1||!Array.isArray(value.events)||value.events.length>50000||
        !value.summaries||Array.isArray(value.summaries)||typeof value.summaries!=='object') throw Error('存档格式不受支持，原文件已保留。');
@@ -36,11 +42,18 @@
       if(!validDay(day)||!s||s.day!==day||!Number.isSafeInteger(s.generatedAt)||typeof s.text!=='string'||s.text.length>1000||
          !Array.isArray(s.counts)||s.counts.some(c=>!c||!moodById[c.mood]||!Number.isSafeInteger(c.count)||c.count<1)) throw Error('每日回顾无法读取，原文件已保留。');
     }
-    if(value.skin!==null) {
-      const s=value.skin;
-      if(!s||typeof s.id!=='string'||!/^[A-Fa-f0-9-]{36}$/.test(s.id)||typeof s.name!=='string'||s.name.length>100||
-         !Number.isSafeInteger(s.size)||s.size<1||s.size>512||!Number.isSafeInteger(s.columns)||s.columns<1||s.columns>8||
-         !Array.isArray(s.durations)||s.durations.length<1||s.durations.length>60||s.durations.some(d=>!Number.isFinite(d)||d<.02||d>10)) throw Error('皮肤信息无法读取，原文件已保留。');
+    const overrides=value.moodSkins;
+    if((value.skin!==null&&!validSkin(value.skin))||
+       (Object.hasOwn(value,'moodSkins')&&(!overrides||typeof overrides!=='object'||Array.isArray(overrides)||
+       Object.entries(overrides).some(([mood,skin])=>!Object.hasOwn(moodById,mood)||!validSkin(skin))))) {
+      throw Error('皮肤信息无法读取，原文件已保留。');
+    }
+    const appearances=value.moodAppearances;
+    if((Object.hasOwn(value,'sharedAppearance')&&value.sharedAppearance!=='default')||
+       (Object.hasOwn(value,'moodAppearances')&&(!appearances||typeof appearances!=='object'||Array.isArray(appearances)||
+       Object.entries(appearances).some(([mood,choice])=>!Object.hasOwn(moodById,mood)||
+         !(choice==='default'||choice==='slime'||(mood==='sad'&&choice==='orange')))))) {
+      throw Error('形象选择无法读取，原文件已保留。');
     }
     return JSON.parse(JSON.stringify(value));
   }

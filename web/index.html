@@ -13,7 +13,7 @@
         <div class="pet-actions"><button id="squish">捏一下</button><button id="stroke">摸摸它</button><button id="import-skin" class="text-button">换个模样 <span aria-hidden="true">↗</span></button></div>
         <p class="gesture-note">按住压扁 · 拖动拉伸 · 松手回弹</p>
         <div class="mood-composer"><label class="section-label" for="note">此刻，我感觉</label><div id="mood-options" class="mood-options" role="group" aria-label="选择心情"></div><textarea id="note" rows="2" maxlength="280" placeholder="有什么想留下的吗？也可以什么都不写。" aria-label="心情留言，选填，最多280字符"></textarea><div class="composer-bottom"><span id="save-state" role="status">选一种心情，就可以记下这一刻。</span><button id="record" class="dark">记下此刻</button></div></div>
-        <div class="skin-detail"><span id="skin-label">原生小糯团</span><button id="reset-skin" class="text-button" hidden>恢复小糯团</button></div>
+        <div class="skin-detail"><span id="skin-label">原生小糯团</span><button id="reset-skin" class="text-button" hidden>清除通用形象</button></div>
       </section>
       <section class="calendar-panel" aria-label="心情日历"><div class="calendar-heading"><div><p class="eyebrow">一天一颗，慢慢收藏</p><h2 id="month-label"></h2></div><div class="month-nav"><button id="prev-month" aria-label="上个月">‹</button><button id="today">今天</button><button id="next-month" aria-label="下个月">›</button></div></div><div class="weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div id="calendar" class="calendar" role="group" aria-label="选择日期"></div><div class="calendar-key"><span><i class="empty-key"></i>未记录</span><span>按已记录时段的时长配色</span></div>
         <section class="day-detail"><div class="day-heading"><h3 id="day-label"></h3><span id="entry-count"></span></div><div class="time-axis" aria-label="24小时心情时间轴">
@@ -32,5 +32,27 @@
   </main>
 </div>
 <section id="mini-ui" aria-label="桌面心情小球" hidden><div id="mini-pet-slot"></div></section>
-<dialog id="skin-info"><form method="dialog"><div class="dialog-top"><h2>换一个模样</h2><button aria-label="关闭">×</button></div><p>导入你画的小怪物，或者一张喜欢的动图。</p><ul><li>支持 PNG、JPEG、WebP、GIF、APNG。</li><li>透明背景图片会保留角色轮廓。</li><li>动图最多 60 帧；文件不超过 15 MB。</li><li>导入后仍能压扁、拉伸和贴绷带。</li></ul><p class="muted">首版不读取 Lottie、视频或可执行皮肤脚本。</p><div class="dialog-actions"><button value="cancel">取消</button><button id="choose-skin" type="button" class="dark">选择文件</button></div></form></dialog>
+<dialog id="close-prompt" aria-labelledby="close-title" aria-describedby="close-description close-reassurance">
+  <button id="close-cancel" class="close-cancel" aria-label="留在日历" title="留在日历">×</button>
+  <div class="close-portrait" aria-hidden="true"><img id="close-pet" alt=""></div>
+  <h2 id="close-title">换个地方，继续陪你。</h2>
+  <p id="close-description">把小糯团放到桌面，<br>忙自己的事时，也有一份小小陪伴。</p>
+  <div class="close-actions"><button id="close-quit">确认关闭</button><button id="close-desktop" class="dark" autofocus>放到桌面 <span aria-hidden="true">↗</span></button></div>
+  <p id="close-reassurance">关闭会退出心晴，已保存的心情仍会留在这里。</p>
+  <p id="close-error" role="alert" hidden></p>
+</dialog>
+<dialog id="skin-info" aria-labelledby="skin-title">
+  <div class="dialog-top"><h2 id="skin-title">换一个模样</h2><form method="dialog"><button aria-label="关闭">×</button></form></div>
+  <div id="shared-skin"></div>
+  <ul id="mood-skins" aria-label="各心情的形象"></ul>
+  <p id="skin-status" role="status"></p>
+</dialog>
+<dialog id="appearance-picker" aria-labelledby="appearance-title">
+  <div class="dialog-top">
+    <h2 id="appearance-title">选择形象</h2>
+    <form method="dialog"><button aria-label="返回形象列表" title="返回形象列表">×</button></form>
+  </div>
+  <div id="appearance-options" role="group" aria-labelledby="appearance-title"></div>
+  <p id="appearance-status" role="status"></p>
+</dialog>
 </body></html>

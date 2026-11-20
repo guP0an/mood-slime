@@ -96,11 +96,52 @@ dialog::backdrop{background:#2932234d}
 .dialog-top{display:flex;justify-content:space-between;align-items:center;gap:50px}
 .dialog-top h2{font-size:23px}
 .dialog-top button{font-size:22px;border:0;padding:0 5px}
+#skin-info{width:540px;max-width:calc(100% - 28px);max-height:calc(100% - 28px);padding:20px;border-radius:8px;overflow:auto}
+#skin-info .dialog-top{gap:12px;margin-bottom:10px}
+#skin-info h2{margin:0;font-size:20px}
+#skin-info .dialog-top button{width:32px;height:32px}
+#mood-skins{margin:12px 0 0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px}
+.skin-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;min-height:52px;border-bottom:1px solid var(--line);line-height:1.4}
+.skin-row strong{display:flex;align-items:center;gap:6px;font-size:13px}
+.skin-row .mood-dot{flex:none}
+.skin-row small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#73796E;font-size:11px;margin-top:3px}
+.skin-row button{white-space:nowrap;padding:5px 7px}
+#appearance-picker{width:360px;max-width:calc(100% - 28px);max-height:calc(100% - 28px);padding:20px;border-radius:8px;overflow:auto}
+#appearance-picker .dialog-top{gap:12px;margin-bottom:12px}
+#appearance-picker h2{margin:0;font-size:18px}
+#appearance-picker .dialog-top button{width:32px;height:32px}
+#appearance-options{display:grid;gap:7px}
+#appearance-options button{display:grid;grid-template-columns:minmax(0,1fr) 18px;align-items:center;gap:10px;min-height:54px;padding:8px 12px;text-align:left}
+#appearance-options button:hover{background:#F7F5EE}
+#appearance-options button[aria-pressed="true"]{background:#EAF0E6;border-color:#9DAE97}
+#appearance-options strong,#appearance-options small{display:block;overflow-wrap:anywhere}
+#appearance-options small{margin-top:3px;color:#687461}
+#appearance-options .choice-mark{visibility:hidden;text-align:center}
+#appearance-options [aria-pressed="true"] .choice-mark{visibility:visible}
+#skin-status,#appearance-status{margin:10px 0 0;font-size:11px;line-height:1.5}
+#skin-status:empty,#appearance-status:empty{margin:0}
+@media(max-width:475px){#mood-skins{grid-template-columns:1fr}#skin-info{padding:14px}}
 dialog p,dialog li{font-size:12px;line-height:1.9}
 dialog ul{padding-left:18px}
 .muted{color:#939B88;font-size:10px!important}
 .dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
 [hidden]{display:none!important}
+
+#close-prompt{width:400px;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);padding:24px 32px 23px;border:1px solid var(--line);border-radius:22px;background:var(--paper);color:#4D4243;text-align:center;box-shadow:0 20px 70px #4D424326;letter-spacing:0;overflow:auto}
+#close-prompt::backdrop{background:#4D424338;backdrop-filter:blur(3px)}
+#close-prompt .close-cancel{position:absolute;right:14px;top:14px;width:30px;height:30px;padding:0;border:0;border-radius:50%;font-size:23px;font-weight:300;line-height:28px;color:#81786F}
+.close-portrait{height:128px;margin:0 -8px 10px;display:flex;align-items:center;justify-content:center}
+.close-portrait img{display:block;width:220px;height:128px;object-fit:contain}
+#close-title{font-size:22px;line-height:1.45;font-weight:600;letter-spacing:0}
+#close-description{margin:12px 0 25px;font-size:13px;line-height:1.85;color:#737C6D}
+.close-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.close-actions button{min-height:44px;padding:11px 12px;font-size:13px;font-weight:500;border-radius:8px}
+#close-quit{background:#FFFDF9;border-color:#E1D5CB;color:#73645D}
+#close-desktop span{margin-left:12px}
+#close-reassurance{margin:16px 0 0;font-size:10px;line-height:1.8;color:#81786F}
+#close-error{margin:12px 0 0;font-size:12px;color:#9A513B;line-height:1.7}
+@media(hover:hover)and(pointer:fine){#close-quit:hover{background:#F1E6DC}#close-desktop:hover{background:#66554C}#close-prompt .close-cancel:hover{background:#EDE5DC}}
+@media(max-width:420px){#close-prompt{padding:23px 20px}#close-title{font-size:20px}}
 
 body.mini .app-shell{display:none}
 html.desktop-mode,body.mini{width:100%;height:100%;overflow:hidden;overscroll-behavior:none}

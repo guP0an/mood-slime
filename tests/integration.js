@@ -4,11 +4,67 @@ function check(value,label){if(!value)throw Error(label);checks.push(label);}
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const app=window.moodApp;
 const native=(action,data={})=>new Promise(resolve=>{const id=100000+Math.floor(Math.random()*100000);const original=window.nativeReply;window.nativeReply=(rid,value)=>{if(rid===id){window.nativeReply=original;resolve(value);}else original(rid,value);};window.webkit.messageHandlers.mood.postMessage({id,action,...data});});
+async function checkMoodSkins(sharedSkin){
+  const happySkin=await native('testImportSkin'),sadSkin=await native('testImportSkin');
+  document.getElementById('import-skin').click();
+  check(document.getElementById('skin-info').open&&document.querySelectorAll('#mood-skins > li').length===MoodModel.moods.length,'appearance dialog lists all ten moods');
+  check(await app.applyImportedSkin(happySkin,'happy')&&await app.applyImportedSkin(sadSkin,'sad'),'legacy appearances are available for each mood');
+  const close=()=>document.querySelector('#skin-info [aria-label="关闭"]').click();
+  close();
+  const selectMood=id=>document.querySelector('#mood-options [data-mood="'+id+'"]').click();
+  async function showsSkin(id){
+    for(let i=0;i<50&&((app.pet.skin?.id||null)!==id);i++)await wait(20);
+    return (app.pet.skin?.id||null)===id;
+  }
+  selectMood('happy');check(await showsSkin(happySkin.skin.id),'happy loads its own atlas');
+  selectMood('sad');check(await showsSkin(sadSkin.skin.id),'sad loads its own atlas');
+  selectMood('calm');check(await showsSkin(sharedSkin.id),'unconfigured mood uses the shared skin');
+  const openPicker=mood=>{
+    document.getElementById('import-skin').click();
+    document.querySelector('#mood-skins [data-mood="'+mood+'"] button').click();
+  };
+  const option=choice=>document.querySelector('#appearance-options [data-choice="'+choice+'"]');
+  const choose=async choice=>{option(choice).click();await app.whenIdle();};
+  const closePicker=()=>{document.querySelector('#appearance-picker [aria-label="返回形象列表"]').click();close();};
+  openPicker('happy');
+  check(document.getElementById('appearance-picker').open&&!option('orange'),'picker lists only faces supported for the selected mood');
+  await native('testFailNextSave');
+  await choose('slime');
+  check(option('image').getAttribute('aria-pressed')==='true'&&!app.snapshot().moodAppearances?.happy,'failed write preserves the selected appearance');
+  closePicker();
+  document.getElementById('reset-skin').click();await app.whenIdle();
+  check(app.snapshot().sharedAppearance==='default'&&app.snapshot().skin.id===sharedSkin.id&&await showsSkin(null),'reset stops using the shared image without removing it from the catalog');
+  selectMood('happy');check(await showsSkin(happySkin.skin.id),'clearing shared skin preserves the happy override');
+  openPicker('happy');await choose('slime');
+  check(await showsSkin(null)&&app.snapshot().moodAppearances.happy==='slime'&&app.snapshot().moodSkins.sad.id===sadSkin.skin.id,'choosing happy slime preserves the sad image');
+  closePicker();
+  selectMood('sad');
+  check(await showsSkin(sadSkin.skin.id)&&!app.pet.orangeCompanion?.visible,'a dedicated sad image can still override the built-in model');
+  openPicker('sad');
+  await choose('slime');
+  check(app.pet.mesh.visible&&!app.pet.skinMesh.visible&&option('slime').getAttribute('aria-pressed')==='true','sad uses the native 3D slime when chosen');
+  await choose('orange');
+  const model=app.pet.orangeCompanion;
+  const size=new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+  check(model.visible&&!app.pet.skinMesh.visible&&!app.pet.mesh.visible&&size.z>.75,'sad switches back to the volumetric orange model');
+  await choose('image');check(await showsSkin(sadSkin.skin.id),'legacy image remains selectable');
+  await choose('orange');
+  check(app.snapshot().moodAppearances.sad==='orange'&&option('orange').getAttribute('aria-pressed')==='true','model choice is saved and marked in the picker');
+  closePicker();
+}
 await app.ready;
 await native('testShowWindow');
 const visibleDeadline=performance.now()+2500;while(document.hidden&&performance.now()<visibleDeadline)await wait(40);
 check(!document.hidden,'PRECONDITION: native UI verification requires an unlocked Mac and a visible window: '+JSON.stringify(await native('testMenuInfo')));
 await wait(120);
+if(skinDialogOnly){
+  const shared=await native('testImportSkin');
+  check(await app.applyImportedSkin(shared),'shared animated image saves through the native bridge');
+  await checkMoodSkins(shared.skin);
+  await app.desktop(true);
+  await app.desktop(false);
+  return checks;
+}
 check(!!app,'app booted in native WebKit');
 const initialCanvas=document.getElementById('pet'),gl=app.pet.renderer.getContext(),pixel=new Uint8Array(4);
 app.pet.draw();gl.readPixels(Math.floor(initialCanvas.width/2),Math.floor(initialCanvas.height/2),1,1,gl.RGBA,gl.UNSIGNED_BYTE,pixel);
@@ -69,6 +125,24 @@ await wait(80);
 document.getElementById('record-details').open=true;
 check((await native('testSnapshot',{name:'calendar.png'})).ok,'calendar screenshot');
 document.getElementById('record-details').open=false;
+const closeDialog=document.getElementById('close-prompt');
+await native('testClosePrompt');
+const closeDeadline=performance.now()+2000;while(!closeDialog.open&&performance.now()<closeDeadline)await wait(20);
+check(closeDialog.open,'native window close opens the branded confirmation');
+check(document.activeElement.id==='close-desktop','desktop action receives default focus');
+await document.getElementById('close-pet').decode();
+check(document.getElementById('close-pet').naturalWidth>0,'confirmation displays the current rendered pet');
+check(document.getElementById('close-quit').getBoundingClientRect().right<document.getElementById('close-desktop').getBoundingClientRect().left,'quit stays left and desktop stays right');
+check((await native('testSnapshot',{name:'close-prompt.png'})).ok,'branded close confirmation screenshot');
+document.getElementById('close-cancel').click();await wait(80);
+check(!closeDialog.open&&!app.mini,'cancel keeps the calendar open');
+await native('testClosePrompt');await wait(80);
+check(closeDialog.open,'close confirmation can reopen after cancellation');
+document.getElementById('close-desktop').click();
+const desktopDeadline=performance.now()+2500;while((!app.mini||closeDialog.open)&&performance.now()<desktopDeadline)await wait(20);
+check(app.mini&&!closeDialog.open,'confirmation desktop button switches to the real native pet window');
+await app.desktop(false);
+if(closeDialogOnly)return checks;
 const canvas=document.getElementById('pet');
 await showWindow();
 const focusDeadline=performance.now()+2000;while(!document.hasFocus()&&performance.now()<focusDeadline)await wait(40);
@@ -224,7 +298,7 @@ await showWindow();
 const frames=new Set(),frameSamples=[],animationStart=performance.now(),animationClock=app.pet.clock;
 while(performance.now()-animationStart<2000&&frames.size<2){await wait(45);frames.add(app.pet.spriteFrame);frameSamples.push({frame:app.pet.spriteFrame,clock:app.pet.clock,hidden:document.hidden});}
 check(app.pet.reduced.matches?frames.size===1&&frames.has(0):frames.size===2,'animated skin advances both frames, or stays on frame zero under reduced motion: '+JSON.stringify({reduced:app.pet.reduced.matches,frames:[...frames],simulated:app.pet.clock-animationClock,samples:frameSamples,renderErrors}));
-document.getElementById('reset-skin').click();await app.whenIdle();await wait(100);check(!app.snapshot().skin&&!app.pet.image,'reset skin clears saved manifest and renderer');
+await checkMoodSkins(imported.skin);
 check(!app.pending,'no outstanding save');
 await app.desktop(true);await showWindow();
 const eyeKinds=new Set(),eventsBeforeFaces=app.snapshot().events.length;
@@ -234,6 +308,12 @@ for(const mood of MoodModel.moods){
   app.pet.clock=mood.id==='happy'?1.8:mood.id==='tired'?2.7:4;
   app.pet.draw();
   check(app.pet.rope.visible===(mood.id==='overwhelmed'),'suspension rope is limited to the overwhelmed native ball: '+mood.id);
+  if(mood.id==='sad'){
+    check(app.pet.orangeCompanion.visible&&!app.pet.skinMesh.visible,'sad renders the orange companion model');
+    eyeKinds.add('orange companion tears');
+    check((await native('testSnapshot',{name:'mood-sad.png'})).ok,'orange companion screenshot');
+    continue;
+  }
   if(mood.id==='overwhelmed'){
     const mouthCorner=app.pet.overwhelmedMouth.localToWorld(app.pet.overwhelmedMouth.children[0].geometry.parameters.path.getPoint(1));
     const tongueRoot=app.pet.overwhelmedTongue.localToWorld(new THREE.Vector3(0,0,.006));
@@ -271,7 +351,6 @@ for(const mood of MoodModel.moods){
   }
   if(mood.id==='happy')check(new THREE.Box3().setFromObject(app.pet.grin).getSize(new THREE.Vector3()).x/bodyWidth>=.33,'actual toothy smile occupies at least one third of the ball width');
   if(mood.id==='happy')check(app.pet.reduced.matches||app.pet.grin.visible&&app.pet.joyBlush.visible&&app.pet.happyEyes.every(e=>e.visible)&&app.pet.expressionEyes.every(e=>!e.visible)&&app.pet.grin.userData.fill.geometry.type==='ExtrudeGeometry'&&app.pet.facialState.cheekRaise>.05,'joy uses the selected closed smile eyes, two cheek marks and scalloped toothy grin');
-  if(mood.id==='sad')check(app.pet.brows.every(b=>b.visible)&&!app.pet.grin.visible,'sad expression has raised inner brows without the happy laugh');
   const tintInfo=await native('testCodexAlert',{kind:'completed'});
   check(tintInfo.petTint.toLowerCase()==='#'+app.pet.color.getHexString(),'notification bubble follows the rendered pet color for '+mood.id);
   if(mood.id==='tired'){
@@ -281,7 +360,6 @@ for(const mood of MoodModel.moods){
   if(mood.id==='sleepy')check(app.pet.sleepyMouth.visible&&app.pet.sleepMarks.length===2&&app.pet.sleepMarks.every(z=>z.visible)&&!app.pet.exhaustedMouth.visible&&app.pet.expressionEyes.every(e=>e.visible&&!e.userData.parts.bag.visible&&e.userData.parts.glints.every(g=>!g.visible)&&e.userData.profile.height/e.userData.profile.width<.4)&&app.pet.color.getHexString()==='7892ac','approved sleepy B has narrow half-open eyes, a pink yawn, two Z marks and the selected dusty blue');
   if(mood.id==='calm')check(app.pet.expressionEyes.every(e=>e.visible)&&app.pet.glasses.every(g=>g.visible)&&app.pet.catMouth.visible,'calm has clear eyes behind slim black 3D glasses');
   if(mood.id==='anxious')check(app.pet.expressionEyes.every(e=>e.visible)&&app.pet.worriedMouth.visible,'anxiety has independently movable pupils and a wavy mouth');
-  if(mood.id==='sad')check(app.pet.expressionEyes.every(e=>e.userData.parts.pool.visible)&&app.pet.tearDrops.every(e=>e.visible),'sadness has large watery eyes and two teardrops');
   if(mood.id==='resigned')check(app.pet.expressionEyes.every(e=>e.visible)&&app.pet.sighMouth.visible&&app.pet.brows.every(b=>b.visible)&&!app.pet.smirk.visible,'resigned uses drooping eyes, inner-raised brows and a sigh mouth');
   if(mood.id==='speechless')check(app.pet.expressionEyes.every(e=>e.visible&&!e.userData.parts.pupil.visible)&&app.pet.smirk.visible&&app.pet.question.visible&&app.pet.cheeks.every(c=>!c.visible),'speechless has blank white eyes, a crooked smile, a 3D question mark and no blush');
   if(!['angry','happy'].includes(mood.id))check(app.pet.expressionEyes.every(e=>e.visible&&e.userData.parts.shell.userData.fill.geometry.type==='ExtrudeGeometry'),'mood '+mood.id+' uses real outlined 3D eye geometry');

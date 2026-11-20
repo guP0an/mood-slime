@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const M=MoodModel,$=id=>document.getElementById(id),boot=window.__moodBoot||{state:M.empty(),readOnly:true,warning:'请从心晴桌面应用打开，浏览器预览不会保存数据。'};
-  let state,readOnly=!!boot.readOnly,selectedMood='calm',selectedDay=M.dayKey(),view=new Date(),mini=false,pending=0,queue=Promise.resolve(),skinSource=boot.skinSource;
+  let state,readOnly=!!boot.readOnly,selectedMood='calm',selectedDay=M.dayKey(),view=new Date(),mini=false,pending=0,queue=Promise.resolve();
   try{state=M.validate(boot.state);}catch(e){state=M.empty();readOnly=true;boot.warning=e.message;}
   let cursorDay=null,selectedMinute=0,selectedEventId=null,dayAxis=null;
   const callbacks=new Map();let requestId=0;
@@ -9,21 +9,28 @@
   function native(action,data={}){
     return new Promise((resolve,reject)=>{const id=++requestId;let timer=null;
       if(action==='save')timer=setTimeout(()=>notice('仍在等待本机保存结果，请稍候。'),8000);
-      else if(!['importSkin','export','contextMenu','notifyError'].includes(action))timer=setTimeout(()=>{callbacks.delete(id);reject(Error('本机操作未响应，请重试。'));},30000);
+      else if(!['export','contextMenu','notifyError'].includes(action))timer=setTimeout(()=>{callbacks.delete(id);reject(Error('本机操作未响应，请重试。'));},30000);
       callbacks.set(id,{resolve,timer});
       const bridge=window.webkit?.messageHandlers?.mood;
       if(bridge)bridge.postMessage({action,id,...data});else{clearTimeout(timer);callbacks.delete(id);reject(Error('请从桌面应用打开。'));}
     });
   }
-  function notice(message,error=false){$('save-state').textContent=message;$('save-state').style.color=error?'#A05E46':'';if(mini){$('pet-reaction').textContent=message;if(error)native('notifyError',{message}).catch(()=>{});}}
+  function notice(message,error=false){$('save-state').textContent=message;$('save-state').style.color=error?'#A05E46':'';if($('skin-info').open){const status=$('appearance-picker').open?'appearance-status':'skin-status';$(status).textContent=message;$(status).style.color=error?'#A05E46':'';}if(mini){$('pet-reaction').textContent=message;if(error)native('notifyError',{message}).catch(()=>{});}}
   function transact(change,success){
     if(readOnly){notice('存档处于保护模式，请先检查存档位置。',true);return Promise.resolve(false);}
     pending++;renderDisabled();
     const task=queue.then(async()=>{const next=M.validate(change(state));const result=await native('save',{data:next});if(!result.ok)throw Error(result.error||'保存失败，原记录已保留。');state=next;render();if(success)notice(success);return true;}).catch(e=>{notice(e.message,true);return false;}).finally(()=>{pending--;renderDisabled();});
     queue=task;return task;
   }
-  function renderDisabled(){for(const id of ['record','choose-skin','reset-skin'])$(id).disabled=readOnly||pending>0;}
-  function renderMood(){for(const button of $('mood-options').children)button.setAttribute('aria-pressed',String(button.dataset.mood===selectedMood));pet.setMood(selectedMood);}
+  function renderDisabled(){
+    $('record').disabled=readOnly||pending>0;
+    $('reset-skin').disabled=readOnly||pending>0;
+    for(const button of $('appearance-options').children)button.disabled=readOnly||pending>0;
+  }
+  function renderMood(){
+    for(const button of $('mood-options').children)button.setAttribute('aria-pressed',String(button.dataset.mood===selectedMood));
+    renderSkin();
+  }
   for(const m of M.moods){const b=document.createElement('button');b.type='button';b.className='mood-option';b.dataset.mood=m.id;b.style.setProperty('--mood',m.color);b.setAttribute('aria-pressed','false');const dot=document.createElement('span');dot.className='mood-dot';dot.setAttribute('aria-hidden','true');b.append(dot,document.createTextNode(m.name));b.addEventListener('click',()=>{selectedMood=m.id;renderMood();notice('已选'+m.name+'，点击「记下此刻」保存。');});$('mood-options').append(b);
 
   }
@@ -84,7 +91,7 @@
     renderMoment();
   }
   $('time-cursor').addEventListener('input',()=>{selectedEventId=null;selectedMinute=Number($('time-cursor').value);renderMoment();});
-  function render(){const now=new Date();$('date-label').textContent=now.toLocaleDateString('en-CA',{year:'numeric',month:'2-digit',day:'2-digit'}).replaceAll('/','.');$('weekday-label').textContent=now.toLocaleDateString('zh-CN',{weekday:'long'});const last=state.events.at(-1);$('current-label').textContent=last&&last.day===M.dayKey(now)?'最近记录 · '+M.moodById[last.mood].name:'今天还没有记录';$('skin-label').textContent=state.skin?state.skin.name+(state.skin.durations.length>1?' · 动态皮肤':' · 图片皮肤'):'原生小糯团';$('reset-skin').hidden=!state.skin;renderMood();renderCalendar();renderDay();}
+  function render(){const now=new Date();$('date-label').textContent=now.toLocaleDateString('en-CA',{year:'numeric',month:'2-digit',day:'2-digit'}).replaceAll('/','.');$('weekday-label').textContent=now.toLocaleDateString('zh-CN',{weekday:'long'});const last=state.events.at(-1);$('current-label').textContent=last&&last.day===M.dayKey(now)?'最近记录 · '+M.moodById[last.mood].name:'今天还没有记录';$('reset-skin').hidden=!sharedSkin();renderSkinRows();renderMood();renderCalendar();renderDay();}
   async function saveMood(mood,note){const at=new Date(),id=crypto.randomUUID();const ok=await transact(s=>M.closeDays(M.record(s,mood,note,at,id),at),'已保存在这台电脑 · '+at.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}));if(ok){cursorDay=null;selectedMood=mood;selectedDay=M.dayKey(at);view=new Date(at.getFullYear(),at.getMonth(),1);if($('note').value===note)$('note').value='';render();}return ok;}
   $('record').addEventListener('click',()=>saveMood(selectedMood,$('note').value));
   $('squish').addEventListener('click',()=>pet.squish());$('stroke').addEventListener('click',()=>pet.stroke());
@@ -92,6 +99,29 @@
   $('today').addEventListener('click',()=>{view=new Date();selectedDay=M.dayKey();renderCalendar();renderDay();});
   async function desktop(enabled){try{pet.release();$('pet').blur();const result=await native('desktop',{enabled});if(!result.ok)throw Error(result.error);mini=enabled;document.documentElement.classList.toggle('desktop-mode',enabled);document.body.classList.toggle('mini',enabled);$('mini-ui').hidden=!enabled;if(enabled)$('mini-pet-slot').append($('pet-host'));else document.querySelector('.companion-top').after($('pet-host'));window.scrollTo(0,0);pet.resize();}catch(e){notice(e.message,true);}}
   $('desktop').addEventListener('click',()=>desktop(true));
+  const closePrompt=$('close-prompt');let closeBusy=false;
+  function requestClose(){
+    if(mini)return false;
+    if(closePrompt.open)return true;
+    $('appearance-picker').close();$('skin-info').close();pet.release();
+    try{pet.draw();$('close-pet').src=$('pet').toDataURL('image/png');}catch(e){$('close-pet').removeAttribute('src');}
+    $('close-error').hidden=true;closePrompt.showModal();return true;
+  }
+  function closeFailure(message){$('close-error').textContent=message;$('close-error').hidden=false;}
+  function setCloseBusy(value){closeBusy=value;for(const id of ['close-quit','close-desktop','close-cancel'])$(id).disabled=value;}
+  $('close-cancel').addEventListener('click',()=>closePrompt.close());
+  closePrompt.addEventListener('cancel',e=>{if(closeBusy)e.preventDefault();});
+  closePrompt.addEventListener('close',()=>native('closePromptDismissed').catch(()=>{}));
+  $('close-desktop').addEventListener('click',async()=>{
+    if(closeBusy)return;setCloseBusy(true);
+    try{await ready;await desktop(true);if(mini)closePrompt.close();else closeFailure('暂时无法放到桌面，请稍后再试。');}
+    catch(e){closeFailure(e.message);}finally{setCloseBusy(false);}
+  });
+  $('close-quit').addEventListener('click',async()=>{
+    if(closeBusy)return;setCloseBusy(true);
+    try{await queue;const result=await native('confirmQuit');if(!result.ok)throw Error('暂时无法关闭，请稍后再试。');}
+    catch(e){closeFailure(e.message);}finally{setCloseBusy(false);}
+  });
   $('pet').addEventListener('contextmenu',e=>{if(!mini)return;e.preventDefault();pet.release();native('contextMenu',{x:e.clientX,y:e.clientY}).catch(error=>notice(error.message,true));});
   $('pet').addEventListener('keydown',e=>{if(mini&&(e.key==='ContextMenu'||(e.shiftKey&&e.key==='F10'))){e.preventDefault();const r=$('pet').getBoundingClientRect();native('contextMenu',{x:r.width/2,y:r.height/2}).catch(error=>notice(error.message,true));}});
   async function menuAction(command){
@@ -100,15 +130,173 @@
     if(command==='squish'){pet.squish();return true;}
     if(command==='calendar'){await desktop(false);return !mini;}
     if(command==='skin'){await desktop(false);if(mini)return false;$('import-skin').click();return true;}
-    if(command==='resetSkin'){$('reset-skin').click();await queue;return !state.skin;}
+    if(command==='resetSkin'){$('reset-skin').click();await queue;return !sharedSkin();}
     if(command==='export'){await desktop(false);if(mini)return false;$('export').click();return true;}
     if(command==='storage'){await native('storage');return true;}
     return false;
   }
-  $('import-skin').addEventListener('click',()=>{$('skin-info').showModal();});
-  async function applyImportedSkin(result){if(!result.ok)throw Error(result.error);await pet.setSkin(result.skin,result.source);const previous=state.skin,oldSource=skinSource;const ok=await transact(s=>({...s,skin:result.skin}),'新模样已保存。');if(ok)skinSource=result.source;else await pet.setSkin(previous,oldSource);return ok;}
-  $('choose-skin').addEventListener('click',async()=>{if(pending)return;$('skin-info').close();try{const result=await native('importSkin');if(!result.cancelled)await applyImportedSkin(result);}catch(e){notice(e.message,true);}});
-  $('reset-skin').addEventListener('click',async()=>{if(await transact(s=>({...s,skin:null}),'小糯团回来了。')){skinSource=null;await pet.setSkin(null);}});
+  const skinDialog=$('skin-info'),picker=$('appearance-picker'),skinRows=new Map();
+  const characterNames={slime:'原生小糯团',orange:'不开心的橘子'};
+  const defaultCharacter=mood=>mood==='sad'?'orange':'slime';
+  const sharedSkin=()=>state.sharedAppearance==='default'?null:state.skin;
+  let pickerMood=null,skinKey,skinRender=Promise.resolve(),skinRequest=0;
+
+  function appearanceFor(mood){
+    const choice=state.moodAppearances?.[mood];
+    if(choice==='slime'||choice==='orange')return {character:choice};
+    return {
+      character:defaultCharacter(mood),
+      override:choice?null:state.moodSkins?.[mood],
+      shared:sharedSkin()
+    };
+  }
+
+  function renderSkin(){
+    const mood=selectedMood,{character,override,shared}=appearanceFor(mood);
+    const defaultName=characterNames[character]+(character==='orange'?' · 3D 模型':'');
+    const key=JSON.stringify([mood,character,override?.id,shared?.id]);
+    if(key===skinKey)return;
+    skinKey=key;
+    const request=++skinRequest;
+    const primary=override||shared;
+    const label=$('skin-label');
+    pet.setMood(mood,character);
+    // Invalidate any image decode from the previous selection before requesting another atlas.
+    if(!primary||pet.skin?.id!==primary.id)pet.setSkin(null);
+    label.textContent=primary?'正在加载形象…':defaultName;
+    skinRender=(async()=>{
+      let failed=false;
+      for(const [scope,skin] of [[mood,override],[null,shared]]){
+        if(!skin)continue;
+        try{
+          if(pet.skin?.id!==skin.id){
+            const result=await native('skinSource',{...(scope?{mood:scope}:{}),skinID:skin.id});
+            if(request!==skinRequest)return;
+            if(!result.ok)throw Error('无法读取形象文件。');
+            await pet.setSkin(skin,result.source);
+            if(request!==skinRequest)return;
+          }
+          label.textContent=skin.name+(skin.durations.length>1?' · 动态皮肤':' · 图片皮肤');
+          if(failed)label.textContent+=' · 当前心情的形象无法读取';
+          return;
+        }catch(e){
+          if(request!==skinRequest)return;
+          failed=true;
+        }
+      }
+      label.textContent=failed?defaultName+' · 自定义形象无法读取':defaultName;
+    })();
+  }
+
+  function chooseAppearance(mood,choice){
+    return transact(s=>{
+      const next={...s};
+      if(mood){
+        const choices={...s.moodAppearances};
+        if(choice==='image')delete choices[mood];
+        else choices[mood]=choice;
+        next.moodAppearances=choices;
+      }else if(choice==='image')delete next.sharedAppearance;
+      else next.sharedAppearance='default';
+      return next;
+    },'形象已保存。');
+  }
+  async function applyImportedSkin(result,scope=null){
+    if(!result.ok)throw Error(result.error||'图片导入失败。');
+    const ok=await transact(s=>scope?{...s,moodSkins:{...s.moodSkins,[scope]:result.skin}}:{...s,skin:result.skin});
+    if(ok)await skinRender;
+    return ok;
+  }
+
+  function currentChoice(mood){
+    if(!mood)return sharedSkin()?'image':'default';
+    const {character,override,shared}=appearanceFor(mood);
+    return override?'image':shared?'default':character;
+  }
+  function openAppearancePicker(mood){
+    pickerMood=mood;
+    $('appearance-title').textContent=(mood?M.moodById[mood].name:'通用')+' · 选择形象';
+    $('appearance-status').textContent='';
+    const options=$('appearance-options');
+    options.replaceChildren();
+    const choices=mood?[
+      ['slime',characterNames.slime,'3D 模型'],
+      ...(mood==='sad'?[['orange',characterNames.orange,'3D 模型']]:[]),
+      ...(sharedSkin()?[['default','跟随通用形象',sharedSkin().name]]:[])
+    ]:[['default','按心情使用默认形象','']];
+    const image=mood?state.moodSkins?.[mood]:state.skin;
+    if(image)choices.push(['image',image.name||'已保存图片',image.durations.length>1?'已保存动图':'已保存图片']);
+    for(const [choice,name,detail] of choices){
+      const button=document.createElement('button'),text=document.createElement('span'),title=document.createElement('strong');
+      const marker=document.createElement('span');
+      button.type='button';
+      button.dataset.choice=choice;
+      title.textContent=name;
+      text.append(title);
+      if(detail){const subtitle=document.createElement('small');subtitle.textContent=detail;text.append(subtitle);}
+      marker.className='choice-mark';
+      marker.setAttribute('aria-hidden','true');
+      marker.textContent='✓';
+      button.append(text,marker);
+      button.addEventListener('click',async()=>{
+        if(choice===currentChoice(mood)||pending||readOnly)return;
+        await chooseAppearance(mood,choice);
+        if(picker.open&&pickerMood===mood)button.focus();
+      });
+      options.append(button);
+    }
+    renderPickerSelection();
+    renderDisabled();
+    picker.showModal();
+    options.querySelector('[aria-pressed="true"]:enabled')?.focus();
+  }
+  function renderPickerSelection(){
+    const selected=currentChoice(pickerMood);
+    for(const button of $('appearance-options').children)button.setAttribute('aria-pressed',String(button.dataset.choice===selected));
+  }
+  function addSkinRow(mood){
+    const scope=mood?.id||null,name=mood?.name||'通用形象';
+    const row=document.createElement(mood?'li':'div'),detail=document.createElement('div');
+    const title=document.createElement('strong'),status=document.createElement('small');
+    const choose=document.createElement('button');
+    row.className='skin-row';
+    if(mood){
+      row.dataset.mood=scope;
+      row.style.setProperty('--mood',mood.color);
+      const dot=document.createElement('span');
+      dot.className='mood-dot';
+      dot.setAttribute('aria-hidden','true');
+      title.append(dot);
+    }
+    title.append(name);
+    detail.append(title,status);
+    choose.type='button';
+    choose.textContent='选择形象';
+    choose.setAttribute('aria-label',name+'：选择形象');
+    choose.setAttribute('aria-haspopup','dialog');
+    choose.addEventListener('click',()=>openAppearancePicker(scope));
+    row.append(detail,choose);
+    $(mood?'mood-skins':'shared-skin').append(row);
+    skinRows.set(scope,status);
+  }
+  function renderSkinRows(){
+    for(const [scope,status] of skinRows){
+      const choice=currentChoice(scope);
+      if(choice==='image')status.textContent=(scope?state.moodSkins[scope]:state.skin).name||'已保存图片';
+      else if(choice==='default')status.textContent=scope?'跟随通用形象':'按心情使用默认形象';
+      else status.textContent=characterNames[choice]+(choice==='orange'?' · 3D 模型':'');
+      status.title=status.textContent;
+    }
+    if(picker.open)renderPickerSelection();
+  }
+  addSkinRow(null);
+  M.moods.forEach(addSkinRow);
+  $('import-skin').addEventListener('click',()=>{
+    if(skinDialog.open)return;
+    $('skin-status').textContent='';
+    skinDialog.showModal();
+  });
+  $('reset-skin').addEventListener('click',()=>chooseAppearance(null,'default'));
   $('export').addEventListener('click',async()=>{try{await queue;const result=await native('export');if(result.ok)notice('记录已导出。');else if(!result.cancelled)throw Error(result.error);}catch(e){notice(e.message,true);}});
   $('storage').addEventListener('click',()=>native('storage').catch(e=>notice(e.message,true)));
   document.querySelector('.wordmark').addEventListener('click',e=>{e.preventDefault();$('today').click();});
@@ -118,7 +306,7 @@
   if(boot.warning){$('warning').textContent=boot.warning;$('warning').hidden=false;}
   if(state.events.length)selectedMood=state.events.at(-1).mood;
   render();renderDisabled();
-  const ready=(async()=>{if(state.skin){try{await pet.setSkin(state.skin,skinSource);}catch(e){$('warning').hidden=false;$('warning').textContent='皮肤文件无法读取，暂时显示小糯团。心情记录仍保留，可重新导入皮肤。';}}await rollover();return true;})();
-  window.moodApp={ready,menuAction,snapshot:()=>structuredClone(state),saveMood,rollover,desktop,get pet(){return pet;},get pending(){return pending;},get mini(){return mini;},whenIdle:()=>queue};
+  const ready=(async()=>{await skinRender;await rollover();return true;})();
+  window.moodApp={ready,menuAction,requestClose,snapshot:()=>structuredClone(state),saveMood,rollover,desktop,get pet(){return pet;},get pending(){return pending;},get mini(){return mini;},whenIdle:()=>queue};
   if(boot.testing)window.moodApp.applyImportedSkin=applyImportedSkin;
 })();

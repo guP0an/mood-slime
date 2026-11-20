@@ -10,6 +10,13 @@ static BOOL Number(id v,double minimum,double maximum) {return [v isKindOfClass:
 static BOOL Integer(id v,double minimum,double maximum) {return Number(v,minimum,maximum)&&floor([v doubleValue])==[v doubleValue];}
 static BOOL Day(id value) {if(!String(value,10)||[value length]!=10)return NO;NSDateFormatter *f=[NSDateFormatter new];f.locale=[[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];f.dateFormat=@"yyyy-MM-dd";f.lenient=NO;NSDate *d=[f dateFromString:value];return d&&[[f stringFromDate:d] isEqual:value];}
 static BOOL Mood(id value) {return String(value,12)&&[@[@"calm",@"happy",@"sad",@"anxious",@"angry",@"tired",@"resigned",@"speechless",@"overwhelmed",@"sleepy"] containsObject:value];}
+static BOOL ValidSkin(id skin) {
+    if(![skin isKindOfClass:NSDictionary.class]||!String(skin[@"id"],36)||![[NSUUID alloc] initWithUUIDString:skin[@"id"]]||!String(skin[@"name"],100)||!Integer(skin[@"size"],1,512)||!Integer(skin[@"columns"],1,8))return NO;
+    id durations=skin[@"durations"];
+    if(![durations isKindOfClass:NSArray.class]||[durations count]<1||[durations count]>60)return NO;
+    for(id duration in durations)if(!Number(duration,.02,10))return NO;
+    return YES;
+}
 
 @implementation MoodStore
 - (instancetype)initWithRoot:(NSURL *)root {if((self=[super init]))self.root=root;return self;}
@@ -28,9 +35,18 @@ static BOOL Mood(id value) {return String(value,12)&&[@[@"calm",@"happy",@"sad",
         for(id c in s[@"counts"])if(![c isKindOfClass:NSDictionary.class]||!Mood(c[@"mood"])||!Integer(c[@"count"],1,50000))return NO;
     }
     id skin=v[@"skin"];
-    if(skin!=NSNull.null) {
-        if(![skin isKindOfClass:NSDictionary.class]||!String(skin[@"id"],36)||![[NSUUID alloc] initWithUUIDString:skin[@"id"]]||!String(skin[@"name"],100)||!Integer(skin[@"size"],1,512)||!Integer(skin[@"columns"],1,8)||![skin[@"durations"] isKindOfClass:NSArray.class]||[skin[@"durations"] count]<1||[skin[@"durations"] count]>60)return NO;
-        for(id d in skin[@"durations"])if(!Number(d,.02,10))return NO;
+    if(skin!=NSNull.null&&!ValidSkin(skin))return NO;
+    id overrides=v[@"moodSkins"];
+    if(overrides&&![overrides isKindOfClass:NSDictionary.class])return NO;
+    for(id mood in overrides)if(!Mood(mood)||!ValidSkin(overrides[mood]))return NO;
+    id sharedAppearance=v[@"sharedAppearance"];
+    if(sharedAppearance&&![sharedAppearance isEqual:@"default"])return NO;
+    id appearances=v[@"moodAppearances"];
+    if(appearances&&![appearances isKindOfClass:NSDictionary.class])return NO;
+    for(id mood in appearances){
+        id choice=appearances[mood];
+        if(!Mood(mood)||(![choice isEqual:@"default"]&&![choice isEqual:@"slime"]&&
+           !([mood isEqual:@"sad"]&&[choice isEqual:@"orange"])))return NO;
     }
     return YES;
 }
@@ -65,8 +81,10 @@ static BOOL Mood(id value) {return String(value,12)&&[@[@"calm",@"happy",@"sad",
     self.loadedBytes=bytes;self.state=state;return YES;
 }
 - (NSURL *)skinURL:(NSString *)identifier {return [[self.root URLByAppendingPathComponent:@"Skins" isDirectory:YES] URLByAppendingPathComponent:[identifier stringByAppendingString:@".png"]];}
-- (NSString *)skinSource {
-    id skin=self.state[@"skin"];if(![skin isKindOfClass:NSDictionary.class])return nil;
+- (NSString *)skinSourceForMood:(NSString *)mood expectedID:(NSString *)identifier {
+    if(mood&&!Mood(mood))return nil;
+    id skin=mood?self.state[@"moodSkins"][mood]:self.state[@"skin"];
+    if(![skin isKindOfClass:NSDictionary.class]||![skin[@"id"] isEqual:identifier])return nil;
     NSURL *url=[self skinURL:skin[@"id"]];NSNumber *size=nil;[url getResourceValue:&size forKey:NSURLFileSizeKey error:NULL];if(!size||size.unsignedLongLongValue>16*1024*1024)return nil;
     NSData *data=[NSData dataWithContentsOfURL:url];return data?[@"data:image/png;base64," stringByAppendingString:[data base64EncodedStringWithOptions:0]]:nil;
 }
@@ -114,7 +132,7 @@ static BOOL Mood(id value) {return String(value,12)&&[@[@"calm",@"happy",@"sad",
     if(![NSFileManager.defaultManager createDirectoryAtURL:output.URLByDeletingLastPathComponent withIntermediateDirectories:YES attributes:@{NSFilePosixPermissions:@0700} error:error]||![png writeToURL:output options:NSDataWritingAtomic error:error])return nil;
     [NSFileManager.defaultManager setAttributes:@{NSFilePosixPermissions:@0600} ofItemAtPath:output.path error:NULL];
     NSString *name=url.lastPathComponent.stringByDeletingPathExtension;if(name.length>80)name=[name substringToIndex:80];
-    return @{@"ok":@YES,@"skin":@{@"id":identifier,@"name":name,@"size":@(tile),@"columns":@(columns),@"durations":durations},@"source":[@"data:image/png;base64," stringByAppendingString:[png base64EncodedStringWithOptions:0]]};
+    return @{@"ok":@YES,@"skin":@{@"id":identifier,@"name":name,@"size":@(tile),@"columns":@(columns),@"durations":durations}};
 }
 @end
 
@@ -148,6 +166,24 @@ BOOL RunStorageTests(void) {
     CHECK(WriteSyntheticGIF(imageURL),"synthetic animated GIF fixture");
     NSDictionary *imported=[s importImage:imageURL error:&error];CHECK(imported&&[imported[@"skin"][@"durations"] count]==2,"animated image imports all frames");
     CHECK(fabs([imported[@"skin"][@"durations"][1] doubleValue]-.2)<.01,"frame durations preserved");
+    MoodStore *moodStore=[[MoodStore alloc] initWithRoot:[root URLByAppendingPathComponent:@"mood-skins"]];
+    NSDictionary *legacy=[moodStore load];
+    CHECK([moodStore save:legacy error:&error],"legacy save without overrides");
+    NSDictionary *happy=[moodStore importImage:imageURL error:&error][@"skin"];
+    NSDictionary *sad=[moodStore importImage:imageURL error:&error][@"skin"];
+    CHECK(happy&&sad,"separate mood atlases imported");
+    NSMutableDictionary *state=[legacy mutableCopy];
+    state[@"moodSkins"]=@{@"happy":happy,@"constructor":sad};
+    CHECK(![MoodStore validState:state],"reject unknown mood override keys");
+    state[@"skin"]=happy;
+    state[@"moodSkins"]=@{@"happy":happy,@"sad":sad};
+    CHECK([moodStore save:state error:&error],"separate mood manifests saved");
+    MoodStore *reload=[[MoodStore alloc] initWithRoot:moodStore.root];
+    [reload load];
+    CHECK(!reload.readOnly&&[reload skinSourceForMood:@"happy" expectedID:happy[@"id"]]&&[reload skinSourceForMood:@"sad" expectedID:sad[@"id"]],"saved mood atlases reload independently");
+    CHECK(![reload skinSourceForMood:@"sad" expectedID:happy[@"id"]]&&![reload skinSourceForMood:@"calm" expectedID:happy[@"id"]],"native reads only the requested saved manifest");
+    state[@"skin"]=NSNull.null;
+    CHECK([reload save:state error:&error]&&![reload skinSourceForMood:nil expectedID:happy[@"id"]]&&[reload skinSourceForMood:@"happy" expectedID:happy[@"id"]],"shared reset preserves mood overrides");
     NSURL *invalid=[root URLByAppendingPathComponent:@"fake.png"];[@"<script>invalid</script>" writeToURL:invalid atomically:YES encoding:NSUTF8StringEncoding error:NULL];CHECK(![s importImage:invalid error:&error],"reject fake image contents");}
     {MoodStore *eight=[[MoodStore alloc] initWithRoot:[root URLByAppendingPathComponent:@"eight-moods"]];[eight load];
     NSMutableDictionary *state=[EmptyState() mutableCopy];NSMutableArray *events=[NSMutableArray new],*counts=[NSMutableArray new];
